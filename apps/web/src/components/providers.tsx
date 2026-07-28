@@ -67,19 +67,16 @@ function AuthBootstrap({ children }: { children: ReactNode }) {
   const setUser = useAuthStore((state) => state.setUser);
 
   useEffect(() => {
-    let alive = true;
-
     void (async () => {
       const profile = await resolveSession();
-      if (!alive) return;
+      // StrictMode cleanup bo'lsa ham yakuniy holatni yozamiz — aks holda spinnerda qoladi.
       if (!profile) tokenStore.clear();
       setUser(profile);
       if (!profile) goLogin();
+      else if (window.location.pathname.startsWith('/login')) {
+        window.location.replace('/');
+      }
     })();
-
-    return () => {
-      alive = false;
-    };
   }, [setUser]);
 
   return <>{children}</>;
