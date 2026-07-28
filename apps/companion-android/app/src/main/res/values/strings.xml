@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AiCC Companion</string>
+    <string name="status_unknown">Holat: aniqlanmagan</string>
+    <string name="hint_server">Server manzili (http://192.168.1.10:4000)</string>
+    <string name="hint_device_name">Qurilma nomi</string>
+    <string name="hint_operator">Operator email (ixtiyoriy)</string>
+    <string name="hint_secret">Ro\'yxatdan o\'tish siri</string>
+    <string name="action_enroll">Ro\'yxatdan o\'tish</string>
+    <string name="action_permissions">Ruxsatlarni so\'rash</string>
+    <string name="action_battery">Batareya cheklovini olib tashlash</string>
+    <string name="hint_footer">Ilova fon rejimida ishlaydi: SMS yuboradi/qabul qiladi, qurilma holatini serverga uzatadi va click-to-call buyruqlarini bajaradi.</string>
+</resources>

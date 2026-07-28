@@ -1,0 +1,68 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Operator kuniga 8 soat ekranga qaraydi, shuning uchun kontrast yumshoq va
+ * qorong'i rejim asosiy stsenariy sifatida sozlangan.
+ */
+@theme {
+  --color-surface: oklch(99% 0.002 250);
+  --color-surface-raised: oklch(100% 0 0);
+  --color-border-subtle: oklch(92% 0.004 250);
+  --color-text-primary: oklch(25% 0.01 250);
+  --color-text-muted: oklch(55% 0.012 250);
+
+  --color-brand: oklch(58% 0.17 258);
+  --color-brand-strong: oklch(50% 0.19 258);
+
+  --color-positive: oklch(65% 0.16 150);
+  --color-warning: oklch(75% 0.15 80);
+  --color-negative: oklch(60% 0.2 25);
+
+  --radius-panel: 0.75rem;
+}
+
+.dark {
+  --color-surface: oklch(20% 0.012 255);
+  --color-surface-raised: oklch(25% 0.014 255);
+  --color-border-subtle: oklch(32% 0.014 255);
+  --color-text-primary: oklch(94% 0.005 250);
+  --color-text-muted: oklch(70% 0.012 250);
+
+  --color-brand: oklch(65% 0.16 258);
+  --color-brand-strong: oklch(72% 0.15 258);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Klaviatura bilan navigatsiya qilayotgan foydalanuvchi fokusni ko'rishi shart. */
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+@keyframes aicc-pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--color-positive) 60%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 12px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+.animate-ring {
+  animation: aicc-pulse-ring 1.4s ease-out infinite;
+}

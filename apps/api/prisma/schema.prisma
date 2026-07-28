@@ -1,0 +1,666 @@
+// AiCC ma'lumotlar bazasi sxemasi.
+// Multi-tenant: deyarli har bir jadvalda tenantId bor va barcha noyob indekslar
+// tenantId bilan birga qo'yilgan, shunda SaaS rejimiga refaktoringsiz o'tiladi.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Tenant va foydalanuvchilar
+// ---------------------------------------------------------------------------
+
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  timezone  String   @default("Asia/Tashkent")
+  locale    String   @default("uz")
+  isActive  Boolean  @default(true)
+  settings  Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users         User[]
+  contacts      Contact[]
+  pipelines     Pipeline[]
+  deals         Deal[]
+  tasks         Task[]
+  calls         Call[]
+  recordings    Recording[]
+  transcripts   Transcript[]
+  smsMessages   SmsMessage[]
+  smsTemplates  SmsTemplate[]
+  devices       Device[]
+  queues        Queue[]
+  auditLogs     AuditLog[]
+  activities    Activity[]
+
+  @@map("tenants")
+}
+
+enum Role {
+  OPERATOR
+  SUPERVISOR
+  MANAGER
+  ADMIN
+  AI_AGENT
+}
+
+enum OperatorStatus {
+  OFFLINE
+  AVAILABLE
+  ON_CALL
+  AFTER_CALL_WORK
+  BREAK
+}
+
+model User {
+  id           String  @id @default(uuid())
+  tenantId     String
+  email        String
+  passwordHash String
+  fullName     String
+  phone        String?
+  avatarUrl    String?
+  roles        Role[]  @default([OPERATOR])
+  isActive     Boolean @default(true)
+
+  // Ikki bosqichli autentifikatsiya (TOTP). Sir shifrlangan holda saqlanadi.
+  twoFactorEnabled Boolean @default(false)
+  twoFactorSecret  String?
+
+  // Telefoniya: brauzer softfoni ushbu SIP hisobi bilan ro'yxatdan o'tadi.
+  sipExtension String?
+  sipPassword  String?
+
+  status         OperatorStatus @default(OFFLINE)
+  statusReason   String?
+  statusChangedAt DateTime      @default(now())
+  lastLoginAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant           Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  refreshTokens    RefreshToken[]
+  ownedContacts    Contact[]      @relation("ContactOwner")
+  ownedDeals       Deal[]         @relation("DealOwner")
+  assignedTasks    Task[]         @relation("TaskAssignee")
+  createdTasks     Task[]         @relation("TaskCreator")
+  calls            Call[]         @relation("CallOperator")
+  smsMessages      SmsMessage[]   @relation("SmsSender")
+  devices          Device[]       @relation("DeviceOperator")
+  auditLogs        AuditLog[]
+  activities       Activity[]     @relation("ActivityActor")
+  statusEvents     OperatorStatusEvent[]
+
+  @@unique([tenantId, email])
+  @@unique([tenantId, sipExtension])
+  @@index([tenantId, status])
+  @@map("users")
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid())
+  userId     String
+  // Tokenning o'zi emas, SHA-256 xesh saqlanadi.
+  tokenHash  String    @unique
+  // Bir oiladagi tokenlar: qayta ishlatish aniqlansa, butun oila bekor qilinadi.
+  familyId   String
+  userAgent  String?
+  ipAddress  String?
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, familyId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model OperatorStatusEvent {
+  id        String         @id @default(uuid())
+  tenantId  String
+  userId    String
+  status    OperatorStatus
+  reason    String?
+  startedAt DateTime       @default(now())
+  endedAt   DateTime?
+  durationSec Int?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, userId, startedAt])
+  @@map("operator_status_events")
+}
+
+// ---------------------------------------------------------------------------
+// CRM
+// ---------------------------------------------------------------------------
+
+model Contact {
+  id        String   @id @default(uuid())
+  tenantId  String
+  firstName String
+  lastName  String?
+  company   String?
+  email     String?
+  address   String?
+  notes     String?
+  tags      String[] @default([])
+  source    String?
+  ownerId   String?
+
+  // Duplikat aniqlash uchun normallashtirilgan asosiy raqam (faqat raqamlar).
+  primaryPhoneKey String?
+
+  // Birlashtirilgan kartochka boshqasiga ishora qiladi.
+  mergedIntoId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  owner       User?         @relation("ContactOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  mergedInto  Contact?      @relation("ContactMerge", fields: [mergedIntoId], references: [id], onDelete: SetNull)
+  mergedFrom  Contact[]     @relation("ContactMerge")
+  phones      ContactPhone[]
+  deals       Deal[]
+  tasks       Task[]
+  calls       Call[]
+  smsMessages SmsMessage[]
+  activities  Activity[]
+
+  @@index([tenantId, primaryPhoneKey])
+  @@index([tenantId, ownerId])
+  @@index([tenantId, createdAt])
+  @@map("contacts")
+}
+
+model ContactPhone {
+  id        String  @id @default(uuid())
+  tenantId  String
+  contactId String
+  // E.164 ko'rinishi, masalan +998901234567
+  phone     String
+  // Qidiruv va CDR moslashtirish uchun faqat raqamlardan iborat kalit.
+  phoneKey  String
+  label     String? // mobil, ish, uy
+  isPrimary Boolean @default(false)
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, phoneKey, contactId])
+  @@index([tenantId, phoneKey])
+  @@map("contact_phones")
+}
+
+model Pipeline {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  stages PipelineStage[]
+  deals  Deal[]
+
+  @@unique([tenantId, name])
+  @@map("pipelines")
+}
+
+enum StageKind {
+  OPEN
+  WON
+  LOST
+}
+
+model PipelineStage {
+  id         String    @id @default(uuid())
+  tenantId   String
+  pipelineId String
+  name       String
+  // Voronkadagi tartib raqami.
+  position   Int
+  kind       StageKind @default(OPEN)
+  color      String    @default("#64748b")
+
+  pipeline Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  deals    Deal[]
+
+  @@unique([pipelineId, position])
+  @@map("pipeline_stages")
+}
+
+model Deal {
+  id         String    @id @default(uuid())
+  tenantId   String
+  title      String
+  contactId  String?
+  pipelineId String
+  stageId    String
+  ownerId    String?
+  amount     Decimal?  @db.Decimal(14, 2)
+  currency   String    @default("UZS")
+  // Voronka ustuni ichidagi tartib (drag-and-drop uchun).
+  position   Int       @default(0)
+  closedAt   DateTime?
+  lostReason String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contact    Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  pipeline   Pipeline      @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  stage      PipelineStage @relation(fields: [stageId], references: [id])
+  owner      User?         @relation("DealOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  tasks      Task[]
+  activities Activity[]
+
+  @@index([tenantId, pipelineId, stageId, position])
+  @@index([tenantId, ownerId])
+  @@map("deals")
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+model Task {
+  id          String       @id @default(uuid())
+  tenantId    String
+  title       String
+  description String?
+  status      TaskStatus   @default(OPEN)
+  priority    TaskPriority @default(NORMAL)
+  dueAt       DateTime?
+  completedAt DateTime?
+  assigneeId  String?
+  creatorId   String?
+  contactId   String?
+  dealId      String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignee User?    @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  creator  User?    @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  contact  Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  deal     Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, assigneeId, status, dueAt])
+  @@map("tasks")
+}
+
+// ---------------------------------------------------------------------------
+// Telefoniya
+// ---------------------------------------------------------------------------
+
+enum CallDirection {
+  INBOUND
+  OUTBOUND
+  INTERNAL
+}
+
+enum CallState {
+  CREATED
+  RINGING
+  ANSWERED
+  HELD
+  TRANSFERRING
+  ENDED
+  FAILED
+}
+
+enum CallDisposition {
+  ANSWERED
+  NO_ANSWER
+  BUSY
+  FAILED
+  ABANDONED
+  VOICEMAIL
+}
+
+model Queue {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String
+  extension String
+  // round_robin | least_recent | fewest_calls | skill_based
+  strategy  String   @default("round_robin")
+  // SLA: shu soniya ichida javob berilishi kerak.
+  slaSeconds Int     @default(20)
+  maxWaitSeconds Int @default(300)
+  announcePosition Boolean @default(true)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  calls  Call[]
+
+  @@unique([tenantId, extension])
+  @@map("queues")
+}
+
+model Call {
+  id        String @id @default(uuid())
+  tenantId  String
+
+  // Asterisk kanal identifikatori — ARI hodisalari bilan bog'lash uchun.
+  channelId String
+  // Ikki oyoqli qo'ng'iroqni bitta yozuvga birlashtiruvchi kalit.
+  linkedId  String?
+
+  direction   CallDirection
+  state       CallState       @default(CREATED)
+  disposition CallDisposition?
+
+  fromNumber String
+  toNumber   String
+  // CDR ni kontaktga moslashtirish uchun normallashtirilgan kalit.
+  peerKey    String
+
+  operatorId String?
+  contactId  String?
+  queueId    String?
+  campaignId String?
+  trunk      String?
+
+  startedAt   DateTime  @default(now())
+  answeredAt  DateTime?
+  endedAt     DateTime?
+  durationSec Int       @default(0)
+  talkTimeSec Int       @default(0)
+  waitTimeSec Int       @default(0)
+  holdCount   Int       @default(0)
+
+  hangupCause String?
+  notes       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  operator   User?       @relation("CallOperator", fields: [operatorId], references: [id], onDelete: SetNull)
+  contact    Contact?    @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  queue      Queue?      @relation(fields: [queueId], references: [id], onDelete: SetNull)
+  recording  Recording?
+  transcript Transcript?
+  activities Activity[]
+
+  @@unique([tenantId, channelId])
+  @@index([tenantId, startedAt])
+  @@index([tenantId, operatorId, startedAt])
+  @@index([tenantId, peerKey])
+  @@index([tenantId, state])
+  @@map("calls")
+}
+
+model Recording {
+  id       String @id @default(uuid())
+  tenantId String
+  callId   String @unique
+
+  // MinIO/S3 dagi obyekt kaliti. Fayl AES-256 bilan shifrlangan holda saqlanadi.
+  objectKey   String
+  bucket      String
+  sizeBytes   Int      @default(0)
+  durationSec Float    @default(0)
+  format      String   @default("wav")
+  // SSE-C ishlatilganda kalit versiyasini kuzatish uchun.
+  encryptionKeyId String?
+  // Saqlash siyosati bo'yicha avtomatik o'chirish sanasi.
+  retainUntil DateTime?
+  deletedAt   DateTime?
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  call   Call   @relation(fields: [callId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, retainUntil])
+  @@map("recordings")
+}
+
+enum TranscriptSpeaker {
+  OPERATOR
+  CUSTOMER
+  UNKNOWN
+}
+
+model Transcript {
+  id       String @id @default(uuid())
+  tenantId String
+  callId   String @unique
+
+  language String  @default("ru")
+  engine   String  @default("gigaam-v3")
+  // Butun suhbatning yaxlit matni (qidiruv uchun).
+  fullText String  @default("")
+  // AI tomonidan yaratilgan qisqa xulosa (2-bosqichda to'ldiriladi).
+  summary  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant   Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  call     Call                @relation(fields: [callId], references: [id], onDelete: Cascade)
+  segments TranscriptSegment[]
+
+  @@map("transcripts")
+}
+
+model TranscriptSegment {
+  id           String            @id @default(uuid())
+  transcriptId String
+  speaker      TranscriptSpeaker @default(UNKNOWN)
+  text         String
+  startMs      Int
+  endMs        Int
+  confidence   Float?
+
+  transcript Transcript @relation(fields: [transcriptId], references: [id], onDelete: Cascade)
+
+  @@index([transcriptId, startMs])
+  @@map("transcript_segments")
+}
+
+// ---------------------------------------------------------------------------
+// SMS
+// ---------------------------------------------------------------------------
+
+enum SmsDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum SmsStatus {
+  QUEUED
+  SENDING
+  SENT
+  DELIVERED
+  FAILED
+  RECEIVED
+}
+
+model SmsMessage {
+  id       String @id @default(uuid())
+  tenantId String
+
+  direction SmsDirection
+  status    SmsStatus    @default(QUEUED)
+
+  fromNumber String
+  toNumber   String
+  peerKey    String
+  text       String
+  segments   Int          @default(1)
+
+  contactId String?
+  senderId  String?
+  deviceId  String?
+  simSlot   Int?
+
+  // Qaysi implementatsiya yubordi: android | gateway | eskiz
+  provider          String?
+  providerMessageId String?
+  error             String?
+
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contact Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  sender  User?    @relation("SmsSender", fields: [senderId], references: [id], onDelete: SetNull)
+  device  Device?  @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, peerKey, createdAt])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@map("sms_messages")
+}
+
+model SmsTemplate {
+  id       String @id @default(uuid())
+  tenantId String
+  name     String
+  // Matn ichida {{ism}} ko'rinishidagi o'zgaruvchilar ishlatiladi.
+  body     String
+  variables String[] @default([])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, name])
+  @@map("sms_templates")
+}
+
+// ---------------------------------------------------------------------------
+// Qurilmalar (Android Companion / MDM)
+// ---------------------------------------------------------------------------
+
+enum DeviceKind {
+  ANDROID_COMPANION
+  GSM_GATEWAY
+}
+
+model Device {
+  id       String     @id @default(uuid())
+  tenantId String
+  kind     DeviceKind @default(ANDROID_COMPANION)
+  name     String
+  // Android ID yoki shlyuz seriya raqami.
+  hardwareId String
+  operatorId String?
+
+  // Ro'yxatdan o'tgan qurilma shu token bilan autentifikatsiya qiladi (xesh).
+  authTokenHash String?
+
+  phoneNumbers String[] @default([])
+  simSlots     Int      @default(1)
+
+  online         Boolean   @default(false)
+  batteryLevel   Int?
+  signalStrength Int?
+  networkType    String?
+  appVersion     String?
+  lastSeenAt     DateTime?
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant   Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  operator User?        @relation("DeviceOperator", fields: [operatorId], references: [id], onDelete: SetNull)
+  sms      SmsMessage[]
+
+  @@unique([tenantId, hardwareId])
+  @@index([tenantId, online])
+  @@map("devices")
+}
+
+// ---------------------------------------------------------------------------
+// Timeline va audit
+// ---------------------------------------------------------------------------
+
+enum ActivityKind {
+  CALL
+  SMS
+  NOTE
+  DEAL_STAGE_CHANGED
+  TASK
+  SYSTEM
+}
+
+/// Mijoz kartochkasidagi yagona lenta (timeline) uchun birlashtirilgan yozuv.
+model Activity {
+  id        String       @id @default(uuid())
+  tenantId  String
+  kind      ActivityKind
+  contactId String?
+  dealId    String?
+  callId    String?
+  actorId   String?
+  title     String
+  body      String?
+  metadata  Json         @default("{}")
+  occurredAt DateTime    @default(now())
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contact Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  deal    Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  call    Call?    @relation(fields: [callId], references: [id], onDelete: Cascade)
+  actor   User?    @relation("ActivityActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, contactId, occurredAt])
+  @@index([tenantId, dealId, occurredAt])
+  @@map("activities")
+}
+
+model AuditLog {
+  id       String @id @default(uuid())
+  tenantId String
+  userId   String?
+
+  // Masalan: user.create, call.listen, recording.delete
+  action     String
+  resource   String
+  resourceId String?
+  // O'zgargan maydonlar (parollar va sirlar tozalangan holda).
+  changes    Json?
+  ipAddress  String?
+  userAgent  String?
+  success    Boolean @default(true)
+  createdAt  DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, userId, createdAt])
+  @@index([tenantId, resource, resourceId])
+  @@map("audit_logs")
+}
