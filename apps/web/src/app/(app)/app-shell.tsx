@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -25,23 +24,10 @@ import { cn, initials } from '@/lib/utils';
 import { Button, Spinner } from '@/components/ui';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { OperatorStatusControl } from '@/components/operator-status';
-
-const SoftphoneProvider = dynamic(
-  () => import('@/components/softphone/softphone-provider').then((m) => m.SoftphoneProvider),
-  { ssr: false },
-);
-const SoftphonePanel = dynamic(
-  () => import('@/components/softphone/softphone-panel').then((m) => m.SoftphonePanel),
-  { ssr: false },
-);
-const LiveTranscriptPanel = dynamic(
-  () => import('@/components/ai/live-transcript').then((m) => m.LiveTranscriptPanel),
-  { ssr: false },
-);
-const ScreenPop = dynamic(
-  () => import('@/components/crm/screen-pop').then((m) => m.ScreenPop),
-  { ssr: false },
-);
+import { SoftphoneProvider } from '@/components/softphone/softphone-provider';
+import { SoftphonePanel } from '@/components/softphone/softphone-panel';
+import { LiveTranscriptPanel } from '@/components/ai/live-transcript';
+import { ScreenPop } from '@/components/crm/screen-pop';
 
 const NAV_ITEMS: Array<{
   href: string;
@@ -66,8 +52,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [phoneOpen, setPhoneOpen] = useState(false);
 
   useEffect(() => {
-    if (loading || user) return;
-    window.location.replace('/login');
+    if (!loading && !user) window.location.replace('/login');
   }, [loading, user]);
 
   useEffect(() => {

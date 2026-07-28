@@ -8,24 +8,17 @@ import { tokenStore } from '@/lib/api-client';
 import { useAuthStore } from '@/lib/stores';
 import type { CurrentUser } from '@/lib/types';
 
-function goLogin() {
-  if (typeof window === 'undefined') return;
-  if (window.location.pathname.startsWith('/login')) return;
-  window.location.replace('/login');
-}
-
-/** StrictMode ikki marta mount qilsa ham bitta boot. */
+/** Modul darajasida bitta boot — StrictMode/double-mount xavfsiz. */
 let bootPromise: Promise<CurrentUser | null> | null = null;
 
-async function resolveSession(): Promise<CurrentUser | null> {
+function resolveSession(): Promise<CurrentUser | null> {
   if (bootPromise) return bootPromise;
 
   bootPromise = (async () => {
-    const origin = window.location.origin;
     const ctrl = new AbortController();
     const timer = window.setTimeout(() => ctrl.abort(), 8_000);
-
     try {
+      const origin = window.location.origin;
       let me = await fetch(`${origin}/api/v1/users/me`, {
         credentials: 'include',
         signal: ctrl.signal,
@@ -59,24 +52,19 @@ async function resolveSession(): Promise<CurrentUser | null> {
   return bootPromise;
 }
 
-/**
- * Sessiyani mustaqil fetch bilan tekshiradi (api-client retry loopsiz).
- * Sessiyasiz → darhol /login.
- */
 function AuthBootstrap({ children }: { children: ReactNode }) {
   const setUser = useAuthStore((state) => state.setUser);
 
   useEffect(() => {
-    void (async () => {
-      const profile = await resolveSession();
-      // StrictMode cleanup bo'lsa ham yakuniy holatni yozamiz — aks holda spinnerda qoladi.
-      if (!profile) tokenStore.clear();
-      setUser(profile);
-      if (!profile) goLogin();
-      else if (window.location.pathname.startsWith('/login')) {
-        window.location.replace('/');
-      }
-    })();
+    void resolveSession()
+      .then((profile) => {
+        if (!profile) tokenStore.clear();
+        setUser(profile);
+      })
+      .catch(() => {
+        tokenStore.clear();
+        setUser(null);
+      });
   }, [setUser]);
 
   return <>{children}</>;
@@ -100,14 +88,7 @@ export function Providers({ children }: { children: ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
         <AuthBootstrap>{children}</AuthBootstrap>
-        <Toaster
-          position="top-center"
-          closeButton
-          toastOptions={{
-            className:
-              '!rounded-2xl !border !border-[var(--color-border-subtle)] !bg-[var(--color-glass)] !backdrop-blur-xl !text-[var(--color-text-primary)] !shadow-[var(--shadow-glass)]',
-          }}
-        />
+        <Toaster position="top-center" closeButton />
       </ThemeProvider>
     </QueryClientProvider>
   );

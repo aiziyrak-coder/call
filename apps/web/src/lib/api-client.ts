@@ -33,6 +33,15 @@ export const tokenStore = {
   },
 };
 
+function abortAfter(ms: number): AbortSignal {
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+    return AbortSignal.timeout(ms);
+  }
+  const ctrl = new AbortController();
+  setTimeout(() => ctrl.abort(), ms);
+  return ctrl.signal;
+}
+
 let refreshInFlight: Promise<boolean> | null = null;
 
 function apiOrigin(): string {
@@ -52,7 +61,7 @@ export async function refreshTokens(): Promise<boolean> {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({}),
-        signal: AbortSignal.timeout(8_000),
+        signal: abortAfter(8_000),
       });
       if (!response.ok) {
         tokenStore.clear();
@@ -119,7 +128,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
           ...authHeaders(options.anonymous),
         },
         body: options.body ? JSON.stringify(options.body) : undefined,
-        signal: options.signal ?? AbortSignal.timeout(20_000),
+        signal: options.signal ?? abortAfter(20_000),
       }),
     options.anonymous,
   );
@@ -150,7 +159,7 @@ export async function fetchBlob(path: string, options: Omit<RequestOptions, 'bod
         method: options.method ?? 'GET',
         credentials: 'include',
         headers: authHeaders(options.anonymous),
-        signal: options.signal ?? AbortSignal.timeout(60_000),
+        signal: options.signal ?? abortAfter(60_000),
       }),
     options.anonymous,
   );
