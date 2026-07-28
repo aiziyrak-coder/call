@@ -21,6 +21,7 @@ interface ErrorBody {
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
+  private readonly isProd = process.env.NODE_ENV === 'production';
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
@@ -49,24 +50,36 @@ export class AllExceptionsFilter implements ExceptionFilter {
         typeof payload === 'string'
           ? payload
           : ((payload as { message?: string | string[] }).message ?? exception.message);
+
+      // Production da to'liq getResponse() oshirilmasin — faqat validatsiya tafsiloti.
+      let details: unknown;
+      if (!this.isProd) {
+        details = typeof payload === 'object' ? payload : undefined;
+      } else if (
+        typeof payload === 'object' &&
+        payload &&
+        'issues' in (payload as object)
+      ) {
+        details = { issues: (payload as { issues: unknown }).issues };
+      }
+
       return {
         statusCode: status,
         message: Array.isArray(message) ? message.join('; ') : message,
-        error: exception.name,
-        details: typeof payload === 'object' ? payload : undefined,
+        error: this.isProd ? undefined : exception.name,
+        details,
         path,
         timestamp,
       };
     }
 
     if (exception instanceof Prisma.PrismaClientKnownRequestError) {
-      // P2002 - noyoblik buzilishi, P2025 - yozuv topilmadi.
       if (exception.code === 'P2002') {
         const target = (exception.meta?.target as string[] | undefined)?.join(', ') ?? 'maydon';
         return {
           statusCode: HttpStatus.CONFLICT,
           message: `Bunday yozuv allaqachon mavjud (${target})`,
-          error: 'UniqueConstraintViolation',
+          error: this.isProd ? undefined : 'UniqueConstraintViolation',
           path,
           timestamp,
         };
@@ -75,7 +88,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         return {
           statusCode: HttpStatus.NOT_FOUND,
           message: 'Yozuv topilmadi',
-          error: 'NotFound',
+          error: this.isProd ? undefined : 'NotFound',
           path,
           timestamp,
         };
@@ -85,7 +98,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     return {
       statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
       message: 'Ichki server xatosi',
-      error: 'InternalServerError',
+      error: this.isProd ? undefined : 'InternalServerError',
       path,
       timestamp,
     };

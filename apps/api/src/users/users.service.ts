@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { ConfigService } from '@nestjs/config';
 import type { OperatorStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { FieldCryptoService } from '../common/field-crypto.service';
 import type { AuthUser } from '../auth/auth.types';
 
 export interface SoftphoneCredentials {
@@ -17,6 +18,7 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly crypto: FieldCryptoService,
   ) {}
 
   /**
@@ -37,7 +39,7 @@ export class UsersService {
 
     return {
       extension: record.sipExtension,
-      password: record.sipPassword,
+      password: this.crypto.decrypt(record.sipPassword) ?? record.sipPassword,
       wssUrl: this.config.get<string>('ASTERISK_WSS_URL', 'wss://localhost:8089/ws'),
       domain: this.config.get<string>('ASTERISK_SIP_DOMAIN', 'aicc.local'),
       displayName: record.fullName,

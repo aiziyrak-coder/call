@@ -30,7 +30,11 @@
       "esbuild",
       "prisma",
       "sharp"
-    ]
+    ],
+    "overrides": {
+      "postcss": ">=8.5.18",
+      "js-yaml": ">=5.2.2"
+    }
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

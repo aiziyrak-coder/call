@@ -3,6 +3,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma, type Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
+import { FieldCryptoService } from '../common/field-crypto.service';
 import { skipTake, toPage, type Page } from '../common/pagination';
 import type { AuthUser } from '../auth/auth.types';
 import type { z } from 'zod';
@@ -40,6 +41,7 @@ export class AdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auth: AuthService,
+    private readonly crypto: FieldCryptoService,
   ) {}
 
   // -------------------------------------------------------- foydalanuvchilar
@@ -90,7 +92,9 @@ export class AdminService {
         passwordHash: await this.auth.hashPassword(input.password),
         sipExtension: input.sipExtension ?? null,
         // SIP paroli hech qachon foydalanuvchi tanlagan parol bilan bir xil bo'lmaydi.
-        sipPassword: input.sipExtension ? randomBytes(18).toString('base64url') : null,
+        sipPassword: input.sipExtension
+          ? this.crypto.encrypt(randomBytes(18).toString('base64url'))
+          : null,
       },
       select: USER_SELECT,
     });
@@ -127,7 +131,8 @@ export class AdminService {
           : {
               sipExtension: extension,
               sipPassword: extension
-                ? (existing.sipPassword ?? randomBytes(18).toString('base64url'))
+                ? (existing.sipPassword ??
+                  this.crypto.encrypt(randomBytes(18).toString('base64url')))
                 : null,
             }),
         ...(input.password ? { passwordHash: await this.auth.hashPassword(input.password) } : {}),

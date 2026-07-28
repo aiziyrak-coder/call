@@ -12,14 +12,46 @@ function AuthBootstrap({ children }: { children: ReactNode }) {
   const setUser = useAuthStore((state) => state.setUser);
 
   useEffect(() => {
-    if (!tokenStore.access) {
-      setUser(null);
-      return;
+    let cancelled = false;
+    // Eski localStorage tokenlari — XSS xavfini bartaraf etish.
+    try {
+      window.localStorage.removeItem('aicc.accessToken');
+      window.localStorage.removeItem('aicc.refreshToken');
+    } catch {
+      /* ignore */
     }
-    api
-      .get<CurrentUser>('/users/me')
-      .then(setUser)
-      .catch(() => setUser(null));
+
+    const boot = async () => {
+      try {
+        // Access cookie yoki xotiradagi token orqali.
+        const profile = await api.get<CurrentUser>('/users/me');
+        if (!cancelled) setUser(profile);
+        return;
+      } catch {
+        // Access muddati o'tgan bo'lishi mumkin — refresh cookie uriniladi.
+      }
+
+      try {
+        const refreshed = await api.post<{ accessToken: string; refreshToken: string }>(
+          '/auth/refresh',
+          {},
+          { anonymous: true },
+        );
+        tokenStore.set(refreshed.accessToken, refreshed.refreshToken);
+        const profile = await api.get<CurrentUser>('/users/me');
+        if (!cancelled) setUser(profile);
+      } catch {
+        if (!cancelled) {
+          tokenStore.clear();
+          setUser(null);
+        }
+      }
+    };
+
+    void boot();
+    return () => {
+      cancelled = true;
+    };
   }, [setUser]);
 
   return <>{children}</>;
@@ -31,8 +63,6 @@ export function Providers({ children }: { children: ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            // Real-time yangilanishlar socket orqali keladi, shuning uchun
-            // agressiv qayta so'rovlar shart emas.
             staleTime: 30_000,
             refetchOnWindowFocus: false,
             retry: 1,

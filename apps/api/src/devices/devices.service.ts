@@ -10,6 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { normalizePhone } from '@aicc/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { safeEqual } from '../common/field-crypto.service';
 import { hashToken, DeviceContext } from './device-auth.guard';
 import type { AuthUser } from '../auth/auth.types';
 import type { z } from 'zod';
@@ -44,7 +45,7 @@ export class DevicesService {
 
   async enroll(input: EnrollInput): Promise<{ deviceId: string; deviceToken: string }> {
     const secret = this.config.getOrThrow<string>('DEVICE_ENROLLMENT_SECRET');
-    if (input.enrollmentSecret !== secret) {
+    if (!safeEqual(input.enrollmentSecret, secret)) {
       throw new UnauthorizedException("Ro'yxatdan o'tish siri noto'g'ri");
     }
 

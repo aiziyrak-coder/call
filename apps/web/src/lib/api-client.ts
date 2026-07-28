@@ -1,8 +1,11 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 const API_PREFIX = '/api/v1';
 
-const ACCESS_KEY = 'aicc.accessToken';
-const REFRESH_KEY = 'aicc.refreshToken';
+/**
+ * Access token faqat xotirada — XSS localStorage o'g'irlashini oldini oladi.
+ * Refresh httpOnly cookie orqali (credentials: include).
+ */
+let memoryAccessToken: string | null = null;
 
 export class ApiError extends Error {
   constructor(
@@ -17,40 +20,29 @@ export class ApiError extends Error {
 
 export const tokenStore = {
   get access(): string | null {
-    if (typeof window === 'undefined') return null;
-    return window.localStorage.getItem(ACCESS_KEY);
+    return memoryAccessToken;
   },
   get refresh(): string | null {
-    if (typeof window === 'undefined') return null;
-    return window.localStorage.getItem(REFRESH_KEY);
+    return null; // refresh faqat httpOnly cookie
   },
-  set(access: string, refresh: string): void {
-    window.localStorage.setItem(ACCESS_KEY, access);
-    window.localStorage.setItem(REFRESH_KEY, refresh);
+  set(access: string, _refresh?: string): void {
+    memoryAccessToken = access;
   },
   clear(): void {
-    window.localStorage.removeItem(ACCESS_KEY);
-    window.localStorage.removeItem(REFRESH_KEY);
+    memoryAccessToken = null;
   },
 };
 
-/**
- * Bir vaqtning o'zida bir nechta so'rov 401 olsa, refresh faqat bir marta
- * yuborilishi kerak — aks holda rotatsiya "qayta ishlatish" deb qabul qilinib,
- * butun token oilasi bekor qilinadi.
- */
 let refreshInFlight: Promise<boolean> | null = null;
 
 async function refreshTokens(): Promise<boolean> {
-  const refreshToken = tokenStore.refresh;
-  if (!refreshToken) return false;
-
   refreshInFlight ??= (async () => {
     try {
       const response = await fetch(`${API_BASE}${API_PREFIX}/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
+        credentials: 'include',
+        body: JSON.stringify({}),
       });
       if (!response.ok) {
         tokenStore.clear();
@@ -62,7 +54,6 @@ async function refreshTokens(): Promise<boolean> {
     } catch {
       return false;
     } finally {
-      // Keyingi 401 uchun yangi urinishga ruxsat beramiz.
       setTimeout(() => {
         refreshInFlight = null;
       }, 0);
@@ -91,6 +82,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   const send = async (): Promise<Response> =>
     fetch(url, {
       method: options.method ?? 'GET',
+      credentials: 'include',
       headers: {
         ...(options.body ? { 'Content-Type': 'application/json' } : {}),
         ...(options.anonymous || !tokenStore.access

@@ -169,8 +169,12 @@ export class CrmController {
   @Get('deals/board')
   @RequirePermissions('deal:read:own', 'deal:read:all')
   @ApiOperation({ summary: "Voronka ko'rinishi: bosqichlar va ulardagi bitimlar" })
-  board(@CurrentUser() user: AuthUser, @Query('pipelineId') pipelineId?: string) {
-    return this.deals.board(user, pipelineId);
+  board(
+    @CurrentUser() user: AuthUser,
+    @Query(new ZodQuery(z.object({ pipelineId: z.string().uuid().optional() })))
+    query: { pipelineId?: string },
+  ) {
+    return this.deals.board(user, query.pipelineId);
   }
 
   @Post('deals')

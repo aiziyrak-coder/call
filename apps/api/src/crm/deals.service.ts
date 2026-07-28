@@ -1,5 +1,6 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { resolveScope } from '@aicc/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { scopedWhere } from '../common/tenant-scope';
 import type { AuthUser } from '../auth/auth.types';
@@ -139,17 +140,26 @@ export class DealsService {
 
   async update(user: AuthUser, id: string, input: Partial<DealWrite>) {
     const existing = await this.prisma.deal.findFirst({
-      where: { id, tenantId: user.tenantId },
-      select: { id: true, contactId: true },
+      where: { ...scopedWhere(user, 'deal', 'read'), id },
+      select: { id: true, contactId: true, ownerId: true },
     });
     if (!existing) throw new NotFoundException('Bitim topilmadi');
+
+    const canReassign = resolveScope(user.roles, 'deal', 'read') === 'all';
+    if (input.ownerId !== undefined && input.ownerId !== existing.ownerId && !canReassign) {
+      throw new ForbiddenException("Bitim egasini o'zgartirishga ruxsat yo'q");
+    }
 
     return this.prisma.deal.update({
       where: { id },
       data: {
         title: input.title,
         contactId: input.contactId === undefined ? undefined : input.contactId,
-        ownerId: input.ownerId === undefined ? undefined : input.ownerId,
+        ownerId: canReassign
+          ? input.ownerId === undefined
+            ? undefined
+            : input.ownerId
+          : undefined,
         amount: input.amount !== undefined ? new Prisma.Decimal(input.amount) : undefined,
         currency: input.currency,
         lostReason: input.lostReason === undefined ? undefined : input.lostReason,
@@ -164,7 +174,7 @@ export class DealsService {
    */
   async move(user: AuthUser, id: string, input: DealMove) {
     const deal = await this.prisma.deal.findFirst({
-      where: { id, tenantId: user.tenantId },
+      where: { ...scopedWhere(user, 'deal', 'read'), id },
       select: { id: true, stageId: true, pipelineId: true, title: true, contactId: true },
     });
     if (!deal) throw new NotFoundException('Bitim topilmadi');
@@ -219,8 +229,12 @@ export class DealsService {
   }
 
   async remove(user: AuthUser, id: string): Promise<void> {
-    const result = await this.prisma.deal.deleteMany({ where: { id, tenantId: user.tenantId } });
-    if (result.count === 0) throw new NotFoundException('Bitim topilmadi');
+    const existing = await this.prisma.deal.findFirst({
+      where: { ...scopedWhere(user, 'deal', 'read'), id },
+      select: { id: true },
+    });
+    if (!existing) throw new NotFoundException('Bitim topilmadi');
+    await this.prisma.deal.delete({ where: { id } });
   }
 
   private async resolveTarget(user: AuthUser, pipelineId?: string, stageId?: string) {

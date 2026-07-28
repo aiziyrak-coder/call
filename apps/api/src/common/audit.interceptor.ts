@@ -20,6 +20,12 @@ const REDACTED_FIELDS = new Set([
   'twoFactorSecret',
   'sipPassword',
   'authToken',
+  'enrollmentSecret',
+  'deviceToken',
+  'authorization',
+  'Authorization',
+  'OPENAI_API_KEY',
+  'token',
 ]);
 
 function redact(value: unknown, depth = 0): unknown {

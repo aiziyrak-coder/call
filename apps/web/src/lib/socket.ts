@@ -12,14 +12,13 @@ export function connectSocket(): Socket {
   socket?.disconnect();
   socket = io(`${SOCKET_URL}/realtime`, {
     transports: ['websocket'],
+    withCredentials: true,
     auth: { token: tokenStore.access },
     reconnection: true,
     reconnectionDelay: 1_000,
     reconnectionDelayMax: 10_000,
   });
 
-  // Token yangilangan bo'lishi mumkin, shuning uchun har qayta ulanishda
-  // eng so'nggi token yuboriladi.
   socket.io.on('reconnect_attempt', () => {
     if (socket) socket.auth = { token: tokenStore.access };
   });

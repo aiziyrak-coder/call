@@ -1,9 +1,15 @@
 import { Controller, Delete, Get, Headers, HttpCode, Param, Query, Res } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
+import { z } from 'zod';
+import { createZodDto } from '../common/zod';
 import { RecordingsService } from './recordings.service';
 import { Audit, CurrentUser, Public, RequirePermissions } from '../auth/decorators';
 import type { AuthUser } from '../auth/auth.types';
+
+class StreamQueryDto extends createZodDto(
+  z.object({ token: z.string().min(20).max(4096) }),
+) {}
 
 @ApiTags('recordings')
 @Controller('recordings')
@@ -19,11 +25,11 @@ export class RecordingsController {
   @Get('stream')
   @ApiOperation({ summary: 'Yozuvni oqim sifatida berish (imzolangan token bilan)' })
   async stream(
-    @Query('token') token: string,
+    @Query() query: StreamQueryDto,
     @Headers('range') range: string | undefined,
     @Res() response: Response,
   ): Promise<void> {
-    const result = await this.recordings.openStream(token, range);
+    const result = await this.recordings.openStream(query.token, range);
 
     response.status(range ? 206 : 200);
     response.setHeader('Content-Type', result.contentType);

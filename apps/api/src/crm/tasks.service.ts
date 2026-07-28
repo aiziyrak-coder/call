@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { resolveScope } from '@aicc/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { scopedWhere } from '../common/tenant-scope';
 import { skipTake, toPage, Page } from '../common/pagination';
@@ -73,10 +74,15 @@ export class TasksService {
 
   async update(user: AuthUser, id: string, input: Partial<TaskWrite>) {
     const existing = await this.prisma.task.findFirst({
-      where: { id, tenantId: user.tenantId },
-      select: { id: true, status: true },
+      where: { ...scopedWhere(user, 'task', 'read', 'assigneeId'), id },
+      select: { id: true, status: true, assigneeId: true },
     });
     if (!existing) throw new NotFoundException('Vazifa topilmadi');
+
+    const canReassign = resolveScope(user.roles, 'task', 'read') === 'all';
+    if (input.assigneeId !== undefined && input.assigneeId !== existing.assigneeId && !canReassign) {
+      throw new ForbiddenException("Ijrochini o'zgartirishga ruxsat yo'q");
+    }
 
     const becameDone = input.status === 'DONE' && existing.status !== 'DONE';
 
@@ -88,7 +94,11 @@ export class TasksService {
         status: input.status,
         priority: input.priority,
         dueAt: input.dueAt === undefined ? undefined : input.dueAt,
-        assigneeId: input.assigneeId === undefined ? undefined : input.assigneeId,
+        assigneeId: canReassign
+          ? input.assigneeId === undefined
+            ? undefined
+            : input.assigneeId
+          : undefined,
         contactId: input.contactId === undefined ? undefined : input.contactId,
         dealId: input.dealId === undefined ? undefined : input.dealId,
         completedAt: becameDone ? new Date() : input.status ? null : undefined,
@@ -98,7 +108,11 @@ export class TasksService {
   }
 
   async remove(user: AuthUser, id: string): Promise<void> {
-    const result = await this.prisma.task.deleteMany({ where: { id, tenantId: user.tenantId } });
-    if (result.count === 0) throw new NotFoundException('Vazifa topilmadi');
+    const existing = await this.prisma.task.findFirst({
+      where: { ...scopedWhere(user, 'task', 'read', 'assigneeId'), id },
+      select: { id: true },
+    });
+    if (!existing) throw new NotFoundException('Vazifa topilmadi');
+    await this.prisma.task.delete({ where: { id } });
   }
 }

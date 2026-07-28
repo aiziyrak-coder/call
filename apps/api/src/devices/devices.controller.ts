@@ -17,6 +17,7 @@ import { SmsService } from '../sms/sms.service';
 import { DeviceAuthGuard, DeviceRequest } from './device-auth.guard';
 import {
   DeviceCallReportDto,
+  DeviceCallDto,
   DeviceWriteDto,
   EnrollDeviceDto,
   HeartbeatDto,
@@ -25,6 +26,7 @@ import {
 } from './devices.dto';
 import { Audit, CurrentUser, Public, RequirePermissions } from '../auth/decorators';
 import type { AuthUser } from '../auth/auth.types';
+import { Throttle } from '@nestjs/throttler';
 
 /** Companion ilovasi uchun endpointlar — JWT emas, qurilma tokeni bilan. */
 @ApiTags('devices')
@@ -37,6 +39,7 @@ export class DevicesController {
 
   @Public()
   @Post('enroll')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiOperation({ summary: "Companion ilovasini ro'yxatdan o'tkazish" })
   enroll(@Body() body: EnrollDeviceDto) {
     return this.devices.enroll(body);
@@ -115,7 +118,7 @@ export class DevicesController {
   @RequirePermissions('call:originate')
   @Audit('device.call', 'device')
   @ApiOperation({ summary: "Click-to-call: qurilmaga terish buyrug'i" })
-  call(@CurrentUser() user: AuthUser, @Body() body: { number: string; simSlot?: number }) {
+  call(@CurrentUser() user: AuthUser, @Body() body: DeviceCallDto) {
     return this.devices.requestCall(user, body.number, body.simSlot);
   }
 

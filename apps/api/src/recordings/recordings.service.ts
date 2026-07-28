@@ -14,6 +14,7 @@ import { JwtService } from '@nestjs/jwt';
 import { resolveScope } from '@aicc/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from './storage.service';
+import { safeBasename } from '../common/field-crypto.service';
 import type { AuthUser } from '../auth/auth.types';
 
 const RETENTION_SWEEP_INTERVAL_MS = 6 * 60 * 60 * 1000;
@@ -23,6 +24,7 @@ interface PlaybackTokenPayload {
   rid: string;
   sub: string;
   tid: string;
+  typ: 'playback';
 }
 
 @Injectable()
@@ -85,7 +87,12 @@ export class RecordingsService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    const localPath = resolve(this.spoolDir, params.fileName);
+    const safeName = safeBasename(params.fileName);
+    const localPath = resolve(this.spoolDir, safeName);
+    if (!localPath.startsWith(resolve(this.spoolDir))) {
+      this.logger.warn(`Path traversal urinishi: ${params.fileName}`);
+      return;
+    }
     let body: Buffer;
     try {
       body = await readFile(localPath);
@@ -104,7 +111,7 @@ export class RecordingsService implements OnModuleInit, OnModuleDestroy {
       String(date.getUTCFullYear()),
       String(date.getUTCMonth() + 1).padStart(2, '0'),
       String(date.getUTCDate()).padStart(2, '0'),
-      params.fileName,
+      safeName,
     ].join('/');
 
     await this.storage.put(objectKey, body);
@@ -120,7 +127,7 @@ export class RecordingsService implements OnModuleInit, OnModuleDestroy {
         bucket: this.storage.bucket,
         sizeBytes: stats?.size ?? body.byteLength,
         durationSec: params.durationSec,
-        format: params.fileName.split('.').pop() ?? 'wav',
+        format: safeName.split('.').pop() ?? 'wav',
         encryptionKeyId: this.storage.keyId,
         retainUntil,
       },
@@ -146,7 +153,12 @@ export class RecordingsService implements OnModuleInit, OnModuleDestroy {
     const recording = await this.requireAccessible(user, callId);
 
     const token = await this.jwt.signAsync(
-      { rid: recording.id, sub: user.id, tid: user.tenantId } satisfies PlaybackTokenPayload,
+      {
+        rid: recording.id,
+        sub: user.id,
+        tid: user.tenantId,
+        typ: 'playback',
+      } satisfies PlaybackTokenPayload,
       {
         secret: this.config.getOrThrow<string>('JWT_SECRET'),
         expiresIn: PLAYBACK_TOKEN_TTL_SEC,
@@ -176,6 +188,9 @@ export class RecordingsService implements OnModuleInit, OnModuleDestroy {
       });
     } catch {
       throw new ForbiddenException("Havola yaroqsiz yoki muddati o'tgan");
+    }
+    if (payload.typ !== 'playback') {
+      throw new ForbiddenException('Havola turi noto\'g\'ri');
     }
 
     const recording = await this.prisma.recording.findFirst({

@@ -15,20 +15,18 @@ class HealthController {
   @Public()
   @Get()
   async check() {
-    const [database, cache] = await Promise.all([
-      this.prisma.$queryRaw`SELECT 1`
-        .then(() => 'ok' as const)
-        .catch((error: Error) => `xato: ${error.message}`),
-      this.redis.client
-        .ping()
-        .then(() => 'ok' as const)
-        .catch((error: Error) => `xato: ${error.message}`),
+    const [databaseOk, cacheOk] = await Promise.all([
+      this.prisma.$queryRaw`SELECT 1`.then(() => true).catch(() => false),
+      this.redis.client.ping().then(() => true).catch(() => false),
     ]);
 
-    const healthy = database === 'ok' && cache === 'ok';
+    const healthy = databaseOk && cacheOk;
     return {
       status: healthy ? 'ok' : 'degraded',
-      checks: { database, cache },
+      checks: {
+        database: databaseOk ? 'ok' : 'fail',
+        cache: cacheOk ? 'ok' : 'fail',
+      },
       uptimeSec: Math.floor(process.uptime()),
       timestamp: new Date().toISOString(),
     };

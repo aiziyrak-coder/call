@@ -1,11 +1,10 @@
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { PrismaClient } from '@prisma/client';
+import { decryptField } from '../common/crypto';
 
 /**
  * Bazadagi foydalanuvchilardan `pjsip_endpoints.conf` ni qayta generatsiya qiladi.
- * Admin panelda operator qo'shilgach shu skript ishga tushiriladi va Asterisk ga
- * `module reload res_pjsip.so` yuboriladi.
  */
 const OUTPUT_PATH = resolve(
   process.cwd(),
@@ -22,11 +21,15 @@ const HEADER = `;===============================================================
 `;
 
 function escapeCallerId(name: string): string {
-  // Asterisk konfiguratsiyasida `;` izoh boshlanishi, `<>` esa CallerID sintaksisi.
   return name.replace(/[;<>"]/g, '').trim();
 }
 
 async function main(): Promise<void> {
+  const keyHex = process.env.RECORDING_ENCRYPTION_KEY;
+  if (!keyHex || keyHex.length !== 64) {
+    throw new Error('RECORDING_ENCRYPTION_KEY (64 hex) kerak');
+  }
+
   const prisma = new PrismaClient();
   try {
     const users = await prisma.user.findMany({
@@ -37,6 +40,7 @@ async function main(): Promise<void> {
 
     const blocks = users.map((user) => {
       const ext = user.sipExtension!;
+      const password = decryptField(user.sipPassword, keyHex) ?? '';
       return [
         `[${ext}](webrtc-endpoint)`,
         `auth = ${ext}`,
@@ -46,7 +50,7 @@ async function main(): Promise<void> {
         '',
         `[${ext}](webrtc-auth)`,
         `username = ${ext}`,
-        `password = ${user.sipPassword}`,
+        `password = ${password}`,
         '',
         `[${ext}](webrtc-aor)`,
         '',
@@ -56,13 +60,9 @@ async function main(): Promise<void> {
     const content =
       HEADER.replace('{timestamp}', new Date().toISOString()) + '\n' + blocks.join('\n');
 
-    // Asterisk konfiguratsiyasi har doim LF bilan yozilishi kerak.
-    writeFileSync(OUTPUT_PATH, content.replace(/\r\n/g, '\n'), 'utf8');
+    writeFileSync(OUTPUT_PATH, content.replace(/\r\n/g, '\n'), { encoding: 'utf8', mode: 0o600 });
 
     console.log(`${users.length} ta operator endpointi yozildi: ${OUTPUT_PATH}`);
-    console.log(
-      'Qo\'llash uchun: docker exec aicc-asterisk asterisk -rx "module reload res_pjsip.so"',
-    );
   } finally {
     await prisma.$disconnect();
   }

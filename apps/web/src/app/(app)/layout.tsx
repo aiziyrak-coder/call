@@ -61,12 +61,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   const logout = async () => {
-    const refreshToken = tokenStore.refresh;
-    if (refreshToken) {
-      await api.post('/auth/logout', { refreshToken }, { anonymous: true }).catch(() => undefined);
-    }
+    await api.post('/auth/logout', {}, { anonymous: true }).catch(() => undefined);
     disconnectSocket();
     tokenStore.clear();
+    useAuthStore.getState().setUser(null);
     router.replace('/login');
   };
 

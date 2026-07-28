@@ -210,6 +210,17 @@ export class CallsService {
       throw new ForbiddenException(`"${mode}" rejimiga ruxsat yo'q`);
     }
 
+    // Cross-tenant eavesdrop oldini olish.
+    const call = await this.prisma.call.findFirst({
+      where: { id: callId, tenantId: user.tenantId },
+      select: { id: true },
+    });
+    if (!call) {
+      const active = await this.telephony.activeCalls().catch(() => []);
+      const live = active.find((item) => item.callId === callId && item.tenantId === user.tenantId);
+      if (!live) throw new NotFoundException("Qo'ng'iroq topilmadi");
+    }
+
     const supervisor = await this.prisma.user.findUnique({
       where: { id: user.id },
       select: { sipExtension: true },

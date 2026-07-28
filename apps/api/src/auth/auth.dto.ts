@@ -14,7 +14,7 @@ export const verifyMfaSchema = z.object({
 export class VerifyMfaDto extends createZodDto(verifyMfaSchema) {}
 
 export const refreshSchema = z.object({
-  refreshToken: z.string(),
+  refreshToken: z.string().optional().default(''),
 });
 export class RefreshDto extends createZodDto(refreshSchema) {}
 
@@ -22,6 +22,12 @@ export const confirmMfaSchema = z.object({
   code: z.string().regex(/^\d{6}$/),
 });
 export class ConfirmMfaDto extends createZodDto(confirmMfaSchema) {}
+
+export const disableMfaSchema = z.object({
+  password: z.string().min(8),
+  code: z.string().regex(/^\d{6}$/),
+});
+export class DisableMfaDto extends createZodDto(disableMfaSchema) {}
 
 export const changePasswordSchema = z
   .object({

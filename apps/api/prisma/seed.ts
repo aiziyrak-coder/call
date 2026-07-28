@@ -78,7 +78,7 @@ async function main() {
       },
     });
   }
-  console.log(`  ${userSeeds.length} ta foydalanuvchi tayyor (parol: ${DEMO_PASSWORD})`);
+  console.log(`  ${userSeeds.length} ta foydalanuvchi tayyor`);
 
   const pipeline = await prisma.pipeline.upsert({
     where: { tenantId_name: { tenantId: tenant.id, name: 'Asosiy voronka' } },

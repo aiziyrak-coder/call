@@ -76,7 +76,11 @@ export const recordingReadyEventSchema = baseEvent.extend({
   type: z.literal('recording.ready'),
   callId: z.string(),
   recordingId: z.string(),
-  objectKey: z.string(),
+  objectKey: z
+    .string()
+    .min(1)
+    .max(255)
+    .regex(/^[A-Za-z0-9._-]+$/, 'objectKey faqat xavfsiz fayl nomi bo\'lishi kerak'),
   durationSec: z.number().nonnegative(),
   sizeBytes: z.number().int().nonnegative(),
 });

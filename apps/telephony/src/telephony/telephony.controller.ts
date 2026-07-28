@@ -22,6 +22,7 @@ import {
 import { z } from 'zod';
 import { AsteriskTelephonyProvider } from './asterisk.provider';
 import { CallRegistry } from './call-session';
+import { safeEqual } from '../common/crypto';
 
 /**
  * Telefoniya servisi tashqi tarmoqqa chiqarilmaydi — unga faqat Core API
@@ -37,7 +38,7 @@ class ServiceTokenGuard implements CanActivate {
 
   canActivate(context: ExecutionContext): boolean {
     const header = context.switchToHttp().getRequest<Request>().get('x-aicc-service-token');
-    if (header !== this.token) throw new UnauthorizedException("Servis tokeni noto'g'ri");
+    if (!safeEqual(header, this.token)) throw new UnauthorizedException("Servis tokeni noto'g'ri");
     return true;
   }
 }
@@ -116,8 +117,9 @@ export class TelephonyController {
 
   @Post('calls/:callId/mute')
   @HttpCode(204)
-  async mute(@Param('callId') callId: string, @Body() body: { on: boolean }): Promise<void> {
-    await this.provider.mute(callId, Boolean(body.on));
+  async mute(@Param('callId') callId: string, @Body() body: unknown): Promise<void> {
+    const { on } = z.object({ on: z.boolean() }).parse(body);
+    await this.provider.mute(callId, on);
   }
 
   @Post('calls/:callId/transfer')

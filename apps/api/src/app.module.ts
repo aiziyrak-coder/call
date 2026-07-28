@@ -19,6 +19,7 @@ import { JwtAuthGuard, PermissionsGuard } from './auth/guards';
 import { AuditInterceptor } from './common/audit.interceptor';
 import { AllExceptionsFilter } from './common/exception.filter';
 import { HealthModule } from './health/health.module';
+import { CryptoModule } from './common/crypto.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { HealthModule } from './health/health.module';
       validate: validateEnv,
     }),
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 300 }]),
+    CryptoModule,
     PrismaModule,
     RedisModule,
     RealtimeModule,

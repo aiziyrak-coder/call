@@ -10,10 +10,18 @@ export const userListSchema = paginationSchema.extend({
   isActive: z.coerce.boolean().optional(),
 });
 
+const strongPassword = z
+  .string()
+  .min(10, "Parol kamida 10 belgidan iborat bo'lsin")
+  .max(72)
+  .regex(/[a-z]/, "Kichik harf bo'lishi kerak")
+  .regex(/[A-Z]/, "Katta harf bo'lishi kerak")
+  .regex(/\d/, "Raqam bo'lishi kerak");
+
 export const userCreateSchema = z.object({
   email: z.string().email(),
   fullName: z.string().min(1).max(120),
-  password: z.string().min(8).max(72),
+  password: strongPassword,
   phone: z.string().max(32).optional(),
   roles: z.array(roleSchema).min(1),
   sipExtension: z
@@ -33,7 +41,7 @@ export const userUpdateSchema = z.object({
     .regex(/^\d{3,6}$/)
     .or(z.literal(''))
     .optional(),
-  password: z.string().min(8).max(72).optional(),
+  password: strongPassword.optional(),
 });
 
 export const queueWriteSchema = z.object({

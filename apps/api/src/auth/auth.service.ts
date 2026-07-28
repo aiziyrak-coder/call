@@ -1,11 +1,18 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { hash, verify } from '@node-rs/argon2';
 import { authenticator } from 'otplib';
 import type { Role } from '@aicc/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { FieldCryptoService } from '../common/field-crypto.service';
+import { LoginLockoutService } from './login-lockout.service';
 import type { JwtPayload, RefreshPayload, TokenPair } from './auth.types';
 
 /** Argon2id — OWASP tavsiya etgan parametrlar. */
@@ -32,6 +39,8 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly crypto: FieldCryptoService,
+    private readonly lockout: LoginLockoutService,
   ) {}
 
   static hashToken(token: string): string {
@@ -43,8 +52,11 @@ export class AuthService {
   }
 
   async login(email: string, password: string, ctx: LoginContext = {}): Promise<LoginResult> {
+    const normalized = email.toLowerCase().trim();
+    await this.lockout.assertNotLocked(normalized);
+
     const user = await this.prisma.user.findFirst({
-      where: { email: email.toLowerCase().trim(), isActive: true },
+      where: { email: normalized, isActive: true },
       include: { tenant: { select: { isActive: true } } },
     });
 
@@ -52,11 +64,17 @@ export class AuthService {
     // shunda javob vaqti bo'yicha email mavjudligini aniqlab bo'lmaydi.
     if (!user || !user.tenant.isActive) {
       await hash('dummy-password-for-timing', ARGON2_OPTIONS);
+      await this.lockout.recordFailure(normalized, ctx.ipAddress);
       throw new UnauthorizedException("Email yoki parol noto'g'ri");
     }
 
     const valid = await verify(user.passwordHash, password).catch(() => false);
-    if (!valid) throw new UnauthorizedException("Email yoki parol noto'g'ri");
+    if (!valid) {
+      await this.lockout.recordFailure(normalized, ctx.ipAddress);
+      throw new UnauthorizedException("Email yoki parol noto'g'ri");
+    }
+
+    await this.lockout.clear(normalized);
 
     if (user.twoFactorEnabled) {
       const mfaToken = await this.jwt.signAsync(
@@ -102,14 +120,20 @@ export class AuthService {
     }
     if (payload.mfa) throw new BadRequestException('Bu token allaqachon tasdiqlangan');
 
+    await this.lockout.assertNotLocked(payload.email);
+
     const user = await this.prisma.user.findFirst({
       where: { id: payload.sub, tenantId: payload.tid, isActive: true },
     });
     if (!user?.twoFactorSecret) throw new UnauthorizedException('2FA sozlanmagan');
 
-    if (!authenticator.verify({ token: code, secret: user.twoFactorSecret })) {
+    const secret = this.crypto.decrypt(user.twoFactorSecret);
+    if (!secret || !authenticator.verify({ token: code, secret })) {
+      await this.lockout.recordFailure(payload.email, ctx.ipAddress);
       throw new UnauthorizedException("Tasdiqlash kodi noto'g'ri");
     }
+
+    await this.lockout.clear(payload.email);
 
     const tokens = await this.issueTokens(
       user.id,
@@ -200,11 +224,16 @@ export class AuthService {
 
   async setupTwoFactor(userId: string): Promise<{ secret: string; otpauthUrl: string }> {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    // Yoqilgan 2FA ni o'g'irlangan sessiya orqali o'chirib bo'lmasligi kerak.
+    if (user.twoFactorEnabled) {
+      throw new BadRequestException(
+        "2FA allaqachon yoqilgan. Qayta sozlash uchun avval /auth/mfa/disable orqali o'chiring",
+      );
+    }
     const secret = authenticator.generateSecret();
-    // Kod tasdiqlanmaguncha 2FA yoqilmaydi — foydalanuvchi o'zini bloklab qo'ymasligi uchun.
     await this.prisma.user.update({
       where: { id: userId },
-      data: { twoFactorSecret: secret, twoFactorEnabled: false },
+      data: { twoFactorSecret: this.crypto.encrypt(secret), twoFactorEnabled: false },
     });
     return { secret, otpauthUrl: authenticator.keyuri(user.email, 'AiCC', secret) };
   }
@@ -212,10 +241,28 @@ export class AuthService {
   async confirmTwoFactor(userId: string, code: string): Promise<void> {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
     if (!user.twoFactorSecret) throw new BadRequestException('Avval 2FA sozlanishi kerak');
-    if (!authenticator.verify({ token: code, secret: user.twoFactorSecret })) {
+    const secret = this.crypto.decrypt(user.twoFactorSecret);
+    if (!secret || !authenticator.verify({ token: code, secret })) {
       throw new BadRequestException("Tasdiqlash kodi noto'g'ri");
     }
     await this.prisma.user.update({ where: { id: userId }, data: { twoFactorEnabled: true } });
+  }
+
+  async disableTwoFactor(userId: string, password: string, code: string): Promise<void> {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    const valid = await verify(user.passwordHash, password).catch(() => false);
+    if (!valid) throw new BadRequestException("Parol noto'g'ri");
+    if (!user.twoFactorEnabled || !user.twoFactorSecret) {
+      throw new BadRequestException('2FA yoqilmagan');
+    }
+    const secret = this.crypto.decrypt(user.twoFactorSecret);
+    if (!secret || !authenticator.verify({ token: code, secret })) {
+      throw new BadRequestException("Tasdiqlash kodi noto'g'ri");
+    }
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { twoFactorEnabled: false, twoFactorSecret: null },
+    });
   }
 
   async changePassword(userId: string, current: string, next: string): Promise<void> {
@@ -244,8 +291,6 @@ export class AuthService {
     ctx: LoginContext,
     familyId: string = randomUUID(),
   ): Promise<TokenPair> {
-    // @nestjs/jwt `expiresIn` uchun `ms` kutubxonasining literal turini talab qiladi,
-    // ammo qiymat konfiguratsiyadan keladi — shuning uchun aniq cast qilinadi.
     const accessTtl = this.config.get<string>('JWT_ACCESS_TTL', '15m') as `${number}m`;
     const refreshTtl = this.config.get<string>('JWT_REFRESH_TTL', '7d') as `${number}d`;
 

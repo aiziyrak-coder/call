@@ -54,3 +54,9 @@ export class SmsStatusReportDto extends createZodDto(smsStatusReportSchema) {}
 export class InboundSmsDto extends createZodDto(inboundSmsSchema) {}
 export class DeviceCallReportDto extends createZodDto(deviceCallReportSchema) {}
 export class DeviceWriteDto extends createZodDto(deviceWriteSchema) {}
+
+export const deviceCallSchema = z.object({
+  number: z.string().min(3).max(32),
+  simSlot: z.coerce.number().int().min(0).max(3).optional(),
+});
+export class DeviceCallDto extends createZodDto(deviceCallSchema) {}

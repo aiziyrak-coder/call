@@ -71,11 +71,12 @@ model User {
   roles        Role[]  @default([OPERATOR])
   isActive     Boolean @default(true)
 
-  // Ikki bosqichli autentifikatsiya (TOTP). Sir shifrlangan holda saqlanadi.
+  // Ikki bosqichli autentifikatsiya (TOTP). Sir AES-256-GCM (enc:v1:...) bilan saqlanadi.
   twoFactorEnabled Boolean @default(false)
   twoFactorSecret  String?
 
   // Telefoniya: brauzer softfoni ushbu SIP hisobi bilan ro'yxatdan o'tadi.
+  // sipPassword ham AES-256-GCM bilan shifrlangan holda saqlanadi.
   sipExtension String?
   sipPassword  String?
 
@@ -457,7 +458,7 @@ model Transcript {
   engine   String  @default("gigaam-v3")
   // Butun suhbatning yaxlit matni (qidiruv uchun).
   fullText String  @default("")
-  // AI tomonidan yaratilgan qisqa xulosa (2-bosqichda to'ldiriladi).
+  // AI tomonidan yaratilgan qisqa xulosa.
   summary  String?
 
   createdAt DateTime @default(now())

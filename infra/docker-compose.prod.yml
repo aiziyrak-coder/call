@@ -24,12 +24,21 @@ services:
     image: redis:7-alpine
     container_name: aicc-call-redis
     restart: unless-stopped
-    command: ['redis-server', '--appendonly', 'yes']
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    command:
+      [
+        'redis-server',
+        '--appendonly',
+        'yes',
+        '--requirepass',
+        '${REDIS_PASSWORD}',
+      ]
     volumes:
       - aicc_call_redis:/data
     networks: [aicc_call_net]
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test: ['CMD-SHELL', 'redis-cli -a "$$REDIS_PASSWORD" ping | grep PONG']
       interval: 5s
       timeout: 3s
       retries: 20
@@ -74,7 +83,7 @@ services:
     env_file: [.env.prod]
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
-      REDIS_URL: redis://redis:6379
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       S3_ENDPOINT: http://minio:9000
       TELEPHONY_INTERNAL_URL: http://telephony:4100/internal
       PUBLIC_API_URL: https://call.devflix.uz
@@ -125,7 +134,7 @@ services:
     env_file: [.env.prod]
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
-      REDIS_URL: redis://redis:6379
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       ARI_URL: http://asterisk:8088
       TELEPHONY_PORT: '4100'
       AUDIOSOCKET_HOST: ai-worker
@@ -147,7 +156,7 @@ services:
     restart: unless-stopped
     env_file: [.env.prod]
     environment:
-      REDIS_URL: redis://redis:6379
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       AI_WORKER_PORT: '4200'
       AUDIOSOCKET_PORT: '8090'
       # OPENAI_* va STT_* `.env.prod` dan keladi (env_file)
