@@ -52,14 +52,11 @@ export class DevicesService {
       throw new UnauthorizedException("Ro'yxatdan o'tish siri noto'g'ri");
     }
 
-    if (!input.tenantSlug) {
-      throw new BadRequestException('tenantSlug majburiy');
-    }
-
+    const tenantSlug = input.tenantSlug?.trim() || 'demo';
     const tenant = await this.prisma.tenant.findFirst({
-      where: { slug: input.tenantSlug, isActive: true },
+      where: { slug: tenantSlug, isActive: true },
     });
-    if (!tenant) throw new BadRequestException('Tashkilot topilmadi');
+    if (!tenant) throw new BadRequestException(`Tashkilot topilmadi: ${tenantSlug}`);
 
     const operator = input.operatorEmail
       ? await this.prisma.user.findFirst({
