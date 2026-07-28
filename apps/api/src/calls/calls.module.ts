@@ -18,6 +18,6 @@ import { TranscriptsModule } from '../transcripts/transcripts.module';
   imports: [JwtModule.register({}), RecordingsModule, TranscriptsModule],
   controllers: [CallsController, UsersController],
   providers: [CallsService, CallProjectionService, TelephonyClient, EventConsumer, UsersService],
-  exports: [CallProjectionService, TelephonyClient],
+  exports: [CallProjectionService, TelephonyClient, CallsService],
 })
 export class CallsModule {}

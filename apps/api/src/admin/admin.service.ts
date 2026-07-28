@@ -1,15 +1,19 @@
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, type Role } from '@prisma/client';
+import { normalizePhone } from '@aicc/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
 import { FieldCryptoService } from '../common/field-crypto.service';
+import { CallsService } from '../calls/calls.service';
 import { skipTake, toPage, type Page } from '../common/pagination';
 import type { AuthUser } from '../auth/auth.types';
 import type { z } from 'zod';
 import type {
   auditListSchema,
+  campaignCreateSchema,
   queueWriteSchema,
+  tenantSettingsSchema,
   userCreateSchema,
   userListSchema,
   userUpdateSchema,
@@ -20,6 +24,38 @@ type UserCreate = z.infer<typeof userCreateSchema>;
 type UserUpdate = z.infer<typeof userUpdateSchema>;
 type QueueWrite = z.infer<typeof queueWriteSchema>;
 type AuditList = z.infer<typeof auditListSchema>;
+type TenantSettingsInput = z.infer<typeof tenantSettingsSchema>;
+type CampaignCreate = z.infer<typeof campaignCreateSchema>;
+
+export interface PriceItem {
+  name: string;
+  price: string;
+  unit?: string;
+  note?: string;
+}
+
+export interface CampaignLead {
+  phone: string;
+  status: 'PENDING' | 'DIALING' | 'DONE' | 'FAILED';
+  callId?: string;
+  qualification?: string;
+  error?: string;
+}
+
+export interface StoredCampaign {
+  id: string;
+  name: string;
+  goal: string;
+  status: 'DRAFT' | 'RUNNING' | 'PAUSED' | 'DONE';
+  createdAt: string;
+  leads: CampaignLead[];
+}
+
+interface TenantSettingsBlob {
+  businessProfile?: string;
+  priceList?: PriceItem[];
+  campaigns?: StoredCampaign[];
+}
 
 const USER_SELECT = {
   id: true,
@@ -42,6 +78,7 @@ export class AdminService {
     private readonly prisma: PrismaService,
     private readonly auth: AuthService,
     private readonly crypto: FieldCryptoService,
+    private readonly calls: CallsService,
   ) {}
 
   // -------------------------------------------------------- foydalanuvchilar
@@ -234,5 +271,133 @@ export class AdminService {
     ]);
 
     return toPage(items, total, query);
+  }
+
+  // ----------------------------------------------------------- tenant settings
+
+  async getTenantSettings(user: AuthUser) {
+    const tenant = await this.prisma.tenant.findUniqueOrThrow({
+      where: { id: user.tenantId },
+      select: { id: true, name: true, settings: true },
+    });
+    const settings = (tenant.settings ?? {}) as TenantSettingsBlob;
+    return {
+      tenantId: tenant.id,
+      name: tenant.name,
+      businessProfile: settings.businessProfile ?? '',
+      priceList: settings.priceList ?? [],
+    };
+  }
+
+  async updateTenantSettings(user: AuthUser, input: TenantSettingsInput) {
+    const tenant = await this.prisma.tenant.findUniqueOrThrow({
+      where: { id: user.tenantId },
+      select: { settings: true },
+    });
+    const current = (tenant.settings ?? {}) as TenantSettingsBlob;
+    const next: TenantSettingsBlob = {
+      ...current,
+      ...(input.businessProfile !== undefined
+        ? { businessProfile: input.businessProfile }
+        : {}),
+      ...(input.priceList !== undefined ? { priceList: input.priceList } : {}),
+    };
+    await this.prisma.tenant.update({
+      where: { id: user.tenantId },
+      data: { settings: next as Prisma.InputJsonValue },
+    });
+    return this.getTenantSettings(user);
+  }
+
+  // ---------------------------------------------------------------- campaigns
+
+  async listCampaigns(user: AuthUser) {
+    const settings = await this.readSettings(user.tenantId);
+    return (settings.campaigns ?? []).map((campaign) => ({
+      ...campaign,
+      pending: campaign.leads.filter((lead) => lead.status === 'PENDING').length,
+      done: campaign.leads.filter((lead) => lead.status === 'DONE').length,
+      failed: campaign.leads.filter((lead) => lead.status === 'FAILED').length,
+    }));
+  }
+
+  async createCampaign(user: AuthUser, input: CampaignCreate) {
+    const settings = await this.readSettings(user.tenantId);
+    const phones = [
+      ...new Set(
+        input.phones
+          .map((phone) => normalizePhone(phone) ?? phone.trim())
+          .filter(Boolean),
+      ),
+    ];
+    if (phones.length === 0) throw new BadRequestException('Kamida bitta raqam kerak');
+
+    const campaign: StoredCampaign = {
+      id: randomUUID(),
+      name: input.name.trim(),
+      goal: input.goal?.trim() || 'Mijoz bilan suhbatlashib ehtiyojni aniqlash',
+      status: 'DRAFT',
+      createdAt: new Date().toISOString(),
+      leads: phones.map((phone) => ({ phone, status: 'PENDING' })),
+    };
+    settings.campaigns = [campaign, ...(settings.campaigns ?? [])];
+    await this.writeSettings(user.tenantId, settings);
+    return campaign;
+  }
+
+  /** AI kampaniyani ishga tushirish — navbatdagi raqamlarga originate. */
+  async startCampaign(user: AuthUser, campaignId: string) {
+    const settings = await this.readSettings(user.tenantId);
+    const campaign = settings.campaigns?.find((item) => item.id === campaignId);
+    if (!campaign) throw new NotFoundException('Kampaniya topilmadi');
+
+    campaign.status = 'RUNNING';
+    const batch = campaign.leads.filter((lead) => lead.status === 'PENDING').slice(0, 5);
+    const results: Array<{ phone: string; ok: boolean; error?: string }> = [];
+
+    for (const lead of batch) {
+      lead.status = 'DIALING';
+      try {
+        const originated = await this.calls.originate(user, lead.phone);
+        lead.callId = originated.callId;
+        lead.status = 'DONE';
+        results.push({ phone: lead.phone, ok: true });
+      } catch (error) {
+        lead.status = 'FAILED';
+        lead.error = error instanceof Error ? error.message : String(error);
+        results.push({ phone: lead.phone, ok: false, error: lead.error });
+      }
+    }
+
+    if (campaign.leads.every((lead) => lead.status === 'DONE' || lead.status === 'FAILED')) {
+      campaign.status = 'DONE';
+    }
+
+    await this.writeSettings(user.tenantId, settings);
+    return { campaign, results };
+  }
+
+  async pauseCampaign(user: AuthUser, campaignId: string) {
+    const settings = await this.readSettings(user.tenantId);
+    const campaign = settings.campaigns?.find((item) => item.id === campaignId);
+    if (!campaign) throw new NotFoundException('Kampaniya topilmadi');
+    campaign.status = 'PAUSED';
+    await this.writeSettings(user.tenantId, settings);
+    return campaign;
+  }
+
+  private async readSettings(tenantId: string): Promise<TenantSettingsBlob> {
+    const tenant = await this.prisma.tenant.findUniqueOrThrow({
+      where: { id: tenantId },
+      select: { settings: true },
+    });
+    return ((tenant.settings ?? {}) as TenantSettingsBlob) ?? {};
+  }
+
+  private async writeSettings(tenantId: string, settings: TenantSettingsBlob): Promise<void> {
+    await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: { settings: settings as Prisma.InputJsonValue },
+    });
   }
 }

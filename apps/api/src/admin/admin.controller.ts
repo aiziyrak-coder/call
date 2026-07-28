@@ -7,6 +7,8 @@ import {
   QueueWriteDto,
   UserCreateDto,
   UserUpdateDto,
+  TenantSettingsDto,
+  CampaignCreateDto,
   analyticsRangeSchema,
   auditListSchema,
   queueWriteSchema,
@@ -103,14 +105,14 @@ export class AdminController {
   // ----------------------------------------------------------------- analitika
 
   @Get('analytics/realtime')
-  @RequirePermissions('analytics:read:all')
+  @RequirePermissions('analytics:read:all', 'analytics:read:own')
   @ApiOperation({ summary: "Jonli holat: faol qo'ng'iroqlar, navbat, qurilmalar" })
   realtime(@CurrentUser() user: AuthUser) {
     return this.analytics.realtime(user);
   }
 
   @Get('analytics/summary')
-  @RequirePermissions('analytics:read:all')
+  @RequirePermissions('analytics:read:all', 'analytics:read:own')
   @ApiOperation({ summary: "KPI: AHT, SLA, o'tkazib yuborilgan qo'ng'iroqlar" })
   summary(
     @CurrentUser() user: AuthUser,
@@ -130,12 +132,55 @@ export class AdminController {
   }
 
   @Get('analytics/hourly')
-  @RequirePermissions('analytics:read:all')
+  @RequirePermissions('analytics:read:all', 'analytics:read:own')
   @ApiOperation({ summary: 'Soatlik yuklama taqsimoti' })
   hourly(
     @CurrentUser() user: AuthUser,
     @Query(new ZodQuery(analyticsRangeSchema)) query: z.infer<typeof analyticsRangeSchema>,
   ) {
     return this.analytics.hourly(user, query);
+  }
+
+  // ----------------------------------------------------------- biznes / AI
+
+  @Get('tenant-settings')
+  @RequirePermissions('tenant:manage', 'knowledge:manage', 'call:read:own')
+  @ApiOperation({ summary: 'Biznes profili va narxlar (AI uchun)' })
+  getTenantSettings(@CurrentUser() user: AuthUser) {
+    return this.admin.getTenantSettings(user);
+  }
+
+  @Patch('tenant-settings')
+  @RequirePermissions('tenant:manage', 'knowledge:manage')
+  @Audit('tenant.settings', 'tenant')
+  updateTenantSettings(@CurrentUser() user: AuthUser, @Body() body: TenantSettingsDto) {
+    return this.admin.updateTenantSettings(user, body);
+  }
+
+  @Get('campaigns')
+  @RequirePermissions('call:originate')
+  listCampaigns(@CurrentUser() user: AuthUser) {
+    return this.admin.listCampaigns(user);
+  }
+
+  @Post('campaigns')
+  @RequirePermissions('call:originate')
+  @Audit('campaign.create', 'campaign')
+  createCampaign(@CurrentUser() user: AuthUser, @Body() body: CampaignCreateDto) {
+    return this.admin.createCampaign(user, body);
+  }
+
+  @Post('campaigns/:id/start')
+  @RequirePermissions('call:originate')
+  @Audit('campaign.start', 'campaign')
+  startCampaign(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.admin.startCampaign(user, id);
+  }
+
+  @Post('campaigns/:id/pause')
+  @RequirePermissions('call:originate')
+  @Audit('campaign.pause', 'campaign')
+  pauseCampaign(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.admin.pauseCampaign(user, id);
   }
 }

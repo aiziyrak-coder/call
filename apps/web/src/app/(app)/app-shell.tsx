@@ -4,8 +4,6 @@ import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  BarChart3,
-  ClipboardList,
   Headphones,
   LayoutDashboard,
   LogOut,
@@ -13,13 +11,12 @@ import {
   MessageSquare,
   PhoneCall,
   Settings,
-  Users,
   X,
 } from 'lucide-react';
 import { hasPermission, type Permission } from '@aicc/shared';
 import { api, tokenStore } from '@/lib/api-client';
 import { disconnectSocket } from '@/lib/socket';
-import { useAuthStore } from '@/lib/stores';
+import { useAuthStore, useCallStore } from '@/lib/stores';
 import { cn, initials } from '@/lib/utils';
 import { Button, Spinner } from '@/components/ui';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -29,7 +26,6 @@ import { SoftphonePanel } from '@/components/softphone/softphone-panel';
 import { LiveTranscriptPanel } from '@/components/ai/live-transcript';
 import { ScreenPop } from '@/components/crm/screen-pop';
 import { WrapUpDialog } from '@/components/crm/wrap-up-dialog';
-import { useCallStore } from '@/lib/stores';
 
 const NAV_ITEMS: Array<{
   href: string;
@@ -37,14 +33,10 @@ const NAV_ITEMS: Array<{
   icon: typeof LayoutDashboard;
   permission?: Permission;
 }> = [
-  { href: '/', label: 'Ish stoli', icon: LayoutDashboard },
+  { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/calls', label: "Qo'ng'iroqlar", icon: PhoneCall },
-  { href: '/contacts', label: 'Mijozlar', icon: Users },
-  { href: '/deals', label: 'Voronka', icon: BarChart3 },
-  { href: '/tasks', label: 'Vazifalar', icon: ClipboardList },
   { href: '/sms', label: 'SMS', icon: MessageSquare, permission: 'sms:send' },
-  { href: '/supervisor', label: 'Jonli devor', icon: Headphones, permission: 'call:listen' },
-  { href: '/admin', label: 'Sozlamalar', icon: Settings, permission: 'user:read' },
+  { href: '/settings', label: 'Sozlamalar', icon: Settings },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -54,6 +46,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [navOpen, setNavOpen] = useState(false);
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [wrapUpOpen, setWrapUpOpen] = useState(true);
+
+  const onCallsPage = pathname.startsWith('/calls');
 
   useEffect(() => {
     if (pendingWrapUpCallId) setWrapUpOpen(true);
@@ -195,28 +189,32 @@ export function AppShell({ children }: { children: ReactNode }) {
               <OperatorStatusControl onOpenWrapUp={() => setWrapUpOpen(true)} />
             </div>
             <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                className="pressable flex size-10 items-center justify-center rounded-full bg-[var(--color-brand)]/12 text-[var(--color-brand)] xl:hidden"
-                onClick={() => setPhoneOpen(true)}
-                aria-label="Softfonni ochish"
-              >
-                <PhoneCall className="size-[18px]" strokeWidth={2.25} />
-              </button>
+              {onCallsPage ? (
+                <button
+                  type="button"
+                  className="pressable flex size-10 items-center justify-center rounded-full bg-[var(--color-brand)]/12 text-[var(--color-brand)] xl:hidden"
+                  onClick={() => setPhoneOpen(true)}
+                  aria-label="Softfonni ochish"
+                >
+                  <PhoneCall className="size-[18px]" strokeWidth={2.25} />
+                </button>
+              ) : null}
               <ThemeToggle />
             </div>
           </header>
 
           <div className="flex min-h-0 flex-1">
             <main className="animate-fade-up min-w-0 flex-1 overflow-auto p-4 sm:p-6">{children}</main>
-            <aside className="hidden w-[21rem] shrink-0 space-y-4 overflow-y-auto p-4 xl:block">
-              <SoftphonePanel />
-              <LiveTranscriptPanel />
-            </aside>
+            {onCallsPage ? (
+              <aside className="hidden w-[21rem] shrink-0 space-y-4 overflow-y-auto p-4 xl:block">
+                <SoftphonePanel />
+                <LiveTranscriptPanel />
+              </aside>
+            ) : null}
           </div>
         </div>
 
-        {phoneOpen ? (
+        {phoneOpen && onCallsPage ? (
           <div className="fixed inset-0 z-40 xl:hidden">
             <button
               type="button"
@@ -246,10 +244,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <ScreenPop />
       {pendingWrapUpCallId && wrapUpOpen ? (
-        <WrapUpDialog
-          callId={pendingWrapUpCallId}
-          onDone={() => setWrapUpOpen(false)}
-        />
+        <WrapUpDialog callId={pendingWrapUpCallId} onDone={() => setWrapUpOpen(false)} />
       ) : null}
     </SoftphoneProvider>
   );

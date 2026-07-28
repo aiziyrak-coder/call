@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowDownLeft, ArrowUpRight, Send, Users } from 'lucide-react';
 import { toast } from 'sonner';
@@ -10,7 +9,7 @@ import { api } from '@/lib/api-client';
 import { onAiccEvent } from '@/lib/socket';
 import { useAuthStore } from '@/lib/stores';
 import { cn, contactName, formatPhone, timeAgo } from '@/lib/utils';
-import type { Paged, ProviderStatus, SmsMessage, SmsStatus, SmsTemplate } from '@/lib/types';
+import type { Paged, SmsMessage, SmsStatus, SmsTemplate } from '@/lib/types';
 import {
   Badge,
   Button,
@@ -44,7 +43,6 @@ export default function SmsPage() {
   const [bulkOpen, setBulkOpen] = useState(false);
 
   const canBulk = user ? hasPermission(user.roles, 'sms:bulk') : false;
-  const canSeeProviders = user ? hasPermission(user.roles, 'sms:read:all') : false;
 
   const messages = useQuery({
     queryKey: ['sms'],
@@ -57,22 +55,11 @@ export default function SmsPage() {
     staleTime: 5 * 60_000,
   });
 
-  const providers = useQuery({
-    queryKey: ['sms', 'providers'],
-    queryFn: () => api.get<ProviderStatus[]>('/sms/providers'),
-    enabled: canSeeProviders,
-    refetchInterval: 60_000,
-  });
-
-  // Kiruvchi SMS va status o'zgarishi ro'yxatni darhol yangilaydi.
   useEffect(
     () =>
       onAiccEvent((event) => {
-        if (event.type === 'sms.received') {
-          toast.info(`Yangi SMS: ${event.from}`);
-          void queryClient.invalidateQueries({ queryKey: ['sms'] });
-        }
-        if (event.type === 'sms.status') {
+        if (event.type === 'sms.received' || event.type === 'sms.status') {
+          if (event.type === 'sms.received') toast.info(`Yangi SMS: ${event.from}`);
           void queryClient.invalidateQueries({ queryKey: ['sms'] });
         }
       }),
@@ -87,7 +74,7 @@ export default function SmsPage() {
         templateId: templateId || undefined,
       }),
     onSuccess: () => {
-      toast.success("SMS navbatga qo'yildi");
+      toast.success("SMS yuborildi");
       setText('');
       setTemplateId('');
       void queryClient.invalidateQueries({ queryKey: ['sms'] });
@@ -103,46 +90,35 @@ export default function SmsPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold">SMS</h1>
-          <p className="text-xs text-[var(--color-text-muted)]">
-            Android qurilma, GSM-shlyuz yoki Eskiz.uz orqali
+          <h1 className="text-[28px] font-semibold tracking-[-0.04em]">SMS</h1>
+          <p className="mt-1 text-[14px] text-[var(--color-text-muted)]">
+            Matnni yozing va kontaktlarga o&apos;zingiz yuboring
           </p>
         </div>
-
-        <div className="flex items-center gap-2">
-          {providers.data?.map((provider) => (
-            <Badge
-              key={provider.name}
-              tone={provider.healthy ? 'positive' : 'neutral'}
-              title={provider.detail}
-            >
-              {provider.name}
-            </Badge>
-          ))}
-          {canBulk ? (
-            <Button size="sm" variant="secondary" onClick={() => setBulkOpen(true)}>
-              <Users className="size-4" /> Ommaviy
-            </Button>
-          ) : null}
-        </div>
+        {canBulk ? (
+          <Button size="sm" variant="secondary" onClick={() => setBulkOpen(true)}>
+            <Users className="size-4" /> Doimiy mijozlarga
+          </Button>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[360px_1fr]">
         <Card className="h-fit">
           <CardHeader title="Yangi xabar" />
           <div className="space-y-3 px-5 py-4">
-            <Field label="Kimga">
+            <Field label="Telefon">
               <Input
                 value={to}
                 onChange={(event) => setTo(event.target.value)}
                 placeholder="+998 90 123 45 67"
+                inputMode="tel"
               />
             </Field>
 
             {(templates.data?.length ?? 0) > 0 ? (
-              <Field label="Shablon">
+              <Field label="Shablon (ixtiyoriy)">
                 <Select value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
-                  <option value="">Shablonsiz</option>
+                  <option value="">O&apos;zim yozaman</option>
                   {templates.data?.map((template) => (
                     <option key={template.id} value={template.id}>
                       {template.name}
@@ -157,16 +133,16 @@ export default function SmsPage() {
               hint={body ? `${body.length} belgi · ${segments} segment · ${encoding}` : undefined}
             >
               <Textarea
-                rows={5}
+                rows={6}
                 value={selectedTemplate ? selectedTemplate.body : text}
                 disabled={Boolean(selectedTemplate)}
                 onChange={(event) => setText(event.target.value)}
-                placeholder="Xabar matni..."
+                placeholder="Eslatma yoki xabar matni..."
               />
             </Field>
 
             <Button
-              className="w-full"
+              className="w-full rounded-full"
               disabled={!to.trim() || (!text.trim() && !templateId) || send.isPending}
               onClick={() => send.mutate()}
             >
@@ -176,8 +152,7 @@ export default function SmsPage() {
         </Card>
 
         <Card>
-          <CardHeader title="Xabarlar" description="Kiruvchi va chiquvchi SMS lar" />
-
+          <CardHeader title="Tarix" description="Yuborilgan va kelgan SMS" />
           {messages.isLoading ? (
             <div className="flex justify-center py-12">
               <Spinner className="size-5 text-[var(--color-brand)]" />
@@ -203,46 +178,21 @@ export default function SmsPage() {
                     >
                       <Icon className="size-3.5" />
                     </div>
-
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        {message.contact ? (
-                          <Link
-                            href={`/contacts/${message.contact.id}`}
-                            className="text-sm font-medium text-[var(--color-brand)] hover:underline"
-                          >
-                            {contactName(message.contact)}
-                          </Link>
-                        ) : (
-                          <span className="font-mono text-xs tabular-nums">
-                            {formatPhone(peer)}
-                          </span>
-                        )}
-
+                        <span className="font-mono text-xs tabular-nums">
+                          {message.contact
+                            ? contactName(message.contact)
+                            : formatPhone(peer)}
+                        </span>
                         <Badge tone={STATUS_TONE[message.status]}>{message.status}</Badge>
-                        {message.provider ? (
-                          <span className="text-[11px] text-[var(--color-text-muted)]">
-                            {message.provider}
-                          </span>
-                        ) : null}
-                        {message.segments > 1 ? (
-                          <span className="text-[11px] text-[var(--color-text-muted)]">
-                            {message.segments} segment
-                          </span>
-                        ) : null}
-
                         <span className="ml-auto text-xs text-[var(--color-text-muted)]">
                           {timeAgo(message.createdAt)}
                         </span>
                       </div>
-
                       <p className="mt-1 whitespace-pre-wrap text-sm text-[var(--color-text-muted)]">
                         {message.text}
                       </p>
-
-                      {message.error ? (
-                        <p className="mt-1 text-xs text-[var(--color-negative)]">{message.error}</p>
-                      ) : null}
                     </div>
                   </li>
                 );

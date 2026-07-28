@@ -69,6 +69,29 @@ export const analyticsRangeSchema = z.object({
   operatorId: z.string().uuid().optional(),
 });
 
+export const tenantSettingsSchema = z.object({
+  businessProfile: z.string().max(20_000).optional(),
+  priceList: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(200),
+        price: z.string().min(1).max(80),
+        unit: z.string().max(40).optional(),
+        note: z.string().max(400).optional(),
+      }),
+    )
+    .max(200)
+    .optional(),
+});
+
+export const campaignCreateSchema = z.object({
+  name: z.string().min(1).max(120),
+  phones: z.array(z.string().min(5).max(32)).min(1).max(500),
+  goal: z.string().max(2000).optional(),
+});
+
 export class UserCreateDto extends createZodDto(userCreateSchema) {}
 export class UserUpdateDto extends createZodDto(userUpdateSchema) {}
 export class QueueWriteDto extends createZodDto(queueWriteSchema) {}
+export class TenantSettingsDto extends createZodDto(tenantSettingsSchema) {}
+export class CampaignCreateDto extends createZodDto(campaignCreateSchema) {}

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { hasPermission } from '@aicc/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AuthUser } from '../auth/auth.types';
 import type { z } from 'zod';
@@ -100,8 +101,9 @@ export class AnalyticsService {
 
   /** Tanlangan davr uchun KPI: AHT, SLA, o'tkazib yuborilganlar. */
   async summary(user: AuthUser, range: RangeInput): Promise<KpiSummary> {
-    const { from, to } = resolveRange(range);
-    const where = this.callWhere(user.tenantId, from, to, range);
+    const scoped = this.scopeRange(user, range);
+    const { from, to } = resolveRange(scoped);
+    const where = this.callWhere(user.tenantId, from, to, scoped);
 
     const [aggregate, answered, missed, byDirection, slaCount, sms] = await Promise.all([
       this.prisma.call.aggregate({
@@ -221,7 +223,11 @@ export class AnalyticsService {
 
   /** Soatlik taqsimot — smena rejalashtirish uchun. */
   async hourly(user: AuthUser, range: RangeInput) {
-    const { from, to } = resolveRange(range);
+    const scoped = this.scopeRange(user, range);
+    const { from, to } = resolveRange(scoped);
+    const operatorFilter = scoped.operatorId
+      ? Prisma.sql`AND "operatorId" = ${scoped.operatorId}::uuid`
+      : Prisma.empty;
 
     const rows = await this.prisma.$queryRaw<
       Array<{ hour: number; total: bigint; answered: bigint }>
@@ -235,6 +241,7 @@ export class AnalyticsService {
         WHERE "tenantId" = ${user.tenantId}
           AND "startedAt" >= ${from}
           AND "startedAt" <= ${to}
+          ${operatorFilter}
         GROUP BY 1
         ORDER BY 1
       `,
@@ -284,6 +291,17 @@ export class AnalyticsService {
       ...(range.queueId ? { queueId: range.queueId } : {}),
       ...(range.operatorId ? { operatorId: range.operatorId } : {}),
     };
+  }
+
+  /** Faqat o'z analitikasiga ruxsati bor operator uchun operatorId majburiy. */
+  private scopeRange(user: AuthUser, range: RangeInput): RangeInput {
+    if (
+      !hasPermission(user.roles, 'analytics:read:all') &&
+      hasPermission(user.roles, 'analytics:read:own')
+    ) {
+      return { ...range, operatorId: user.id };
+    }
+    return range;
   }
 }
 
