@@ -122,7 +122,7 @@ services:
     stop_grace_period: 45s
     env_file: [.env.prod]
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public&connection_limit=15&pool_timeout=20
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       S3_ENDPOINT: http://minio:9000
       TELEPHONY_INTERNAL_URL: http://telephony:4100/internal
@@ -130,6 +130,9 @@ services:
       CORS_ORIGINS: https://call.devflix.uz
       RECORDING_SPOOL_DIR: /data/recordings
       API_PORT: '4000'
+      NODE_ENV: production
+      # Ixtiyoriy: https://hooks.slack.com/... yoki Discord webhook
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
     volumes:
       - aicc_call_recordings:/data/recordings
     ports:
@@ -195,12 +198,13 @@ services:
     stop_grace_period: 60s
     env_file: [.env.prod]
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public&connection_limit=10&pool_timeout=20
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       ARI_URL: http://asterisk:8088
       TELEPHONY_PORT: '4100'
       AUDIOSOCKET_HOST: ai-worker
       AUDIOSOCKET_PORT: '8090'
+      NODE_ENV: production
     ports:
       - '127.0.0.1:14101:4100'
     depends_on:

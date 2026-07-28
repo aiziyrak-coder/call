@@ -35,9 +35,27 @@ export class AllExceptionsFilter implements ExceptionFilter {
         `${request.method} ${request.url} -> ${body.statusCode}: ${body.message}`,
         exception instanceof Error ? exception.stack : undefined,
       );
+      void this.notifyWebhook(
+        `${request.method} ${request.url} -> ${body.statusCode}: ${body.message}`,
+      );
     }
 
     response.status(body.statusCode).json(body);
+  }
+
+  private async notifyWebhook(text: string): Promise<void> {
+    const url = process.env.ALERT_WEBHOOK_URL;
+    if (!url || !this.isProd) return;
+    try {
+      await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: `AiCC API 5xx: ${text}` }),
+        signal: AbortSignal.timeout(3_000),
+      });
+    } catch {
+      /* monitoring o'zi yiqilmasin */
+    }
   }
 
   private toBody(exception: unknown, path: string): ErrorBody {

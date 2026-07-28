@@ -1,0 +1,94 @@
+# Staging — production dan izolyatsiya (boshqa compose project + portlar).
+# Foydalanish:
+#   cp infra/.env.prod.template infra/.env.staging
+#   # secretlarni almashtiring, PUBLIC_API_URL/CORS ni staging domeniga qo'ying
+#   docker compose -p aicc-staging -f infra/docker-compose.staging.yml --env-file infra/.env.staging up -d
+#
+# Bu fayl production volume/portlariga tegmaydi.
+
+name: aicc-staging
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: '20m'
+    max-file: '3'
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - aicc_staging_pg:/var/lib/postgresql/data
+    networks: [aicc_staging_net]
+    logging: *default-logging
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    command:
+      [
+        'redis-server',
+        '--appendonly',
+        'yes',
+        '--requirepass',
+        '${REDIS_PASSWORD}',
+        '--maxmemory',
+        '256mb',
+        '--maxmemory-policy',
+        'volatile-lru',
+      ]
+    volumes:
+      - aicc_staging_redis:/data
+    networks: [aicc_staging_net]
+    logging: *default-logging
+    healthcheck:
+      test: ['CMD-SHELL', 'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep PONG']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: ['server', '/data', '--console-address', ':9001']
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY}
+    volumes:
+      - aicc_staging_minio:/data
+    networks: [aicc_staging_net]
+    logging: *default-logging
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'curl -sf http://127.0.0.1:9000/minio/health/live >/dev/null || wget -q -O /dev/null http://127.0.0.1:9000/minio/health/live || exit 1',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # App servislarini staging da kerak bo'lganda docker-compose.prod.yml dan
+  # nusxa ko'chirib portlarni 15xxx qatoriga siljiting (masalan 15100).
+  # To'liq telephony/Asterisk staging odatda alohida host yoki shared trunk talab qiladi.
+
+networks:
+  aicc_staging_net:
+    name: aicc_staging_net
+
+volumes:
+  aicc_staging_pg:
+  aicc_staging_redis:
+  aicc_staging_minio:

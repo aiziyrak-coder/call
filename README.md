@@ -65,6 +65,20 @@ pnpm exec dotenv -e ../../.env -- node scripts/test-recording.mjs   # yozuvlar
 pnpm exec dotenv -e ../../.env -- node scripts/test-ai-pipeline.mjs # transkripsiya
 ```
 
+## Production
+
+Prod sayt: **https://call.devflix.uz**
+
+Deploy, rollback, backup/restore, monitoring va diagnostika:
+**[docs/PRODUCTION.md](docs/PRODUCTION.md)**
+
+```bash
+# Serverda
+cd /home/call && git pull && bash scripts/deploy-call-devflix.sh
+bash scripts/rollback-prod.sh          # muammo bo'lsa
+bash scripts/install-prod-cron.sh      # backup + health cron
+```
+
 ## Telefoniyani apparatsiz sinash
 
 GSM-shlyuz kelguncha "PSTN tomoni" softfon bilan simulyatsiya qilinadi:

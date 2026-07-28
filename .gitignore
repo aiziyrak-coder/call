@@ -11,7 +11,7 @@ coverage/
 .env.*.local
 !.env.example
 infra/.env.prod
-
+infra/.env.staging
 
 *.log
 npm-debug.log*
