@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { AuthUser } from '../auth/auth.types';
 
 type TranscriptFinal = Extract<AiccEvent, { type: 'transcript.final' }>;
+type AiSummary = Extract<AiccEvent, { type: 'ai.summary' }>;
 
 @Injectable()
 export class TranscriptsService {
@@ -26,10 +27,10 @@ export class TranscriptsService {
       return;
     }
 
-    const transcript = await this.prisma.transcript.upsert({
+      const transcript = await this.prisma.transcript.upsert({
       where: { callId: event.callId },
-      update: {},
-      create: { tenantId: event.tenantId, callId: event.callId },
+      update: { engine: 'openai' },
+      create: { tenantId: event.tenantId, callId: event.callId, engine: 'openai' },
       select: { id: true },
     });
 
@@ -53,6 +54,25 @@ export class TranscriptsService {
         WHERE "id" = ${transcript.id}
       `,
     ]);
+  }
+
+  /** OpenAI xulosa. */
+  async saveSummary(event: AiSummary): Promise<void> {
+    const result = await this.prisma.transcript.updateMany({
+      where: { callId: event.callId, tenantId: event.tenantId },
+      data: { summary: event.summary },
+    });
+
+    if (result.count === 0) {
+      await this.prisma.transcript.create({
+        data: {
+          tenantId: event.tenantId,
+          callId: event.callId,
+          summary: event.summary,
+          engine: 'openai',
+        },
+      });
+    }
   }
 
   async getByCall(user: AuthUser, callId: string) {

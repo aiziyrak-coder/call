@@ -48,7 +48,8 @@ ekraniga Socket.IO bilan yuboradi.
 ```bash
 # .env
 AI_TRANSCRIPTION_ENABLED=true
-STT_PROVIDER=gigaam        # yoki whisper-live
+STT_PROVIDER=openai          # zaxira: gigaam | whisper-live
+OPENAI_API_KEY=sk-...
 ```
 
 ## Uchidan-uchiga sinovlar

@@ -130,6 +130,11 @@ export class EventConsumer implements OnModuleInit, OnModuleDestroy {
         await this.transcripts.appendSegment(event);
       }
 
+      // OpenAI xulosasi — Transcript.summary maydoniga yoziladi.
+      if (event.type === 'ai.summary') {
+        await this.transcripts.saveSummary(event);
+      }
+
       this.gateway.emitEvent(event, operatorId);
     } catch (error) {
       this.logger.error(

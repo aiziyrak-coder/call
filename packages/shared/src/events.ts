@@ -126,9 +126,37 @@ export const transcriptFinalEventSchema = baseEvent.extend({
   confidence: z.number().min(0).max(1).optional(),
 });
 
+export const aiSentimentEventSchema = baseEvent.extend({
+  type: z.literal('ai.sentiment'),
+  callId: z.string(),
+  /** Mijoz kayfiyati — operator ekranidagi rangli indikator. */
+  sentiment: z.enum(['positive', 'neutral', 'negative', 'angry', 'uncertain']),
+  score: z.number().min(0).max(1),
+  label: z.string(),
+});
+
+export const aiRecommendationEventSchema = baseEvent.extend({
+  type: z.literal('ai.recommendation'),
+  callId: z.string(),
+  /** Keyingi eng yaxshi harakat (next-best-action). */
+  title: z.string(),
+  detail: z.string(),
+  suggestedReply: z.string().optional(),
+});
+
+export const aiSummaryEventSchema = baseEvent.extend({
+  type: z.literal('ai.summary'),
+  callId: z.string(),
+  summary: z.string(),
+  qaScore: z.number().min(0).max(100).optional(),
+});
+
 export const aiEventSchema = z.discriminatedUnion('type', [
   transcriptPartialEventSchema,
   transcriptFinalEventSchema,
+  aiSentimentEventSchema,
+  aiRecommendationEventSchema,
+  aiSummaryEventSchema,
 ]);
 
 export const aiccEventSchema = z.discriminatedUnion('type', [
@@ -144,6 +172,9 @@ export const aiccEventSchema = z.discriminatedUnion('type', [
   deviceStatusEventSchema,
   transcriptPartialEventSchema,
   transcriptFinalEventSchema,
+  aiSentimentEventSchema,
+  aiRecommendationEventSchema,
+  aiSummaryEventSchema,
 ]);
 
 export type AiccEvent = z.infer<typeof aiccEventSchema>;
@@ -152,6 +183,9 @@ export type CallEndedEvent = z.infer<typeof callEndedEventSchema>;
 export type RecordingReadyEvent = z.infer<typeof recordingReadyEventSchema>;
 export type DeviceStatusEvent = z.infer<typeof deviceStatusEventSchema>;
 export type TranscriptFinalEvent = z.infer<typeof transcriptFinalEventSchema>;
+export type AiSentimentEvent = z.infer<typeof aiSentimentEventSchema>;
+export type AiRecommendationEvent = z.infer<typeof aiRecommendationEventSchema>;
+export type AiSummaryEvent = z.infer<typeof aiSummaryEventSchema>;
 
 /** Socket.IO xonalari: operator faqat o'ziga tegishlisini oladi. */
 export const socketRooms = {

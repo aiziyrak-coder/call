@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { SttProvider } from '@aicc/shared';
+import { OpenAiWhisperSttProvider } from './openai-whisper.provider';
 import { GigaAmSttProvider } from './gigaam.provider';
 import { WhisperLiveSttProvider } from './whisper-live.provider';
 
 /**
- * STT provayderi konfiguratsiya bilan tanlanadi: rus tili uchun GigaAM,
- * boshqa tillar yoki GigaAM ishlamayotganda WhisperLive.
+ * STT tanlash: asosiy — OpenAI Whisper; zaxira — GigaAM / WhisperLive.
  */
 @Injectable()
 export class SttRegistry {
@@ -14,28 +14,35 @@ export class SttRegistry {
   private readonly preferred: string;
 
   constructor(
+    private readonly openai: OpenAiWhisperSttProvider,
     private readonly gigaam: GigaAmSttProvider,
     private readonly whisper: WhisperLiveSttProvider,
     config: ConfigService,
   ) {
-    this.preferred = config.get<string>('STT_PROVIDER', 'gigaam');
+    this.preferred = config.get<string>('STT_PROVIDER', 'openai');
   }
 
   get(language: string): SttProvider {
+    if (this.preferred === 'openai') return this.openai;
     if (this.preferred === 'whisper-live') return this.whisper;
-    if (!this.gigaam.supportedLanguages.includes(language as never)) {
-      this.logger.log(`"${language}" tili GigaAM da yo'q — WhisperLive ishlatiladi`);
-      return this.whisper;
+    if (this.preferred === 'gigaam') {
+      if (!this.gigaam.supportedLanguages.includes(language as never)) {
+        this.logger.log(`"${language}" GigaAM da yo'q — OpenAI ishlatiladi`);
+        return this.openai;
+      }
+      return this.gigaam;
     }
-    return this.gigaam;
+    return this.openai;
   }
 
   async status() {
-    const [gigaam, whisper] = await Promise.all([
+    const [openai, gigaam, whisper] = await Promise.all([
+      this.openai.healthCheck(),
       this.gigaam.healthCheck(),
       this.whisper.healthCheck(),
     ]);
     return [
+      { name: this.openai.name, ...openai },
       { name: this.gigaam.name, ...gigaam },
       { name: this.whisper.name, ...whisper },
     ];

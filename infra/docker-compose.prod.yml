@@ -150,7 +150,7 @@ services:
       REDIS_URL: redis://redis:6379
       AI_WORKER_PORT: '4200'
       AUDIOSOCKET_PORT: '8090'
-      AI_TRANSCRIPTION_ENABLED: 'false'
+      # OPENAI_* va STT_* `.env.prod` dan keladi (env_file)
     ports:
       - '127.0.0.1:14102:4200'
       - '127.0.0.1:18090:8090'

@@ -32,7 +32,10 @@ export class CallProjectionService {
         return this.operatorOfCall(event.callId);
       case 'transcript.partial':
       case 'transcript.final':
-        // Suhbat matni faqat o'z operatoriga va jonli devorga ketishi kerak.
+      case 'ai.sentiment':
+      case 'ai.recommendation':
+      case 'ai.summary':
+        // Suhbat matni / AI yordami faqat o'z operatoriga ketadi.
         return this.operatorOfCall(event.callId);
       case 'sms.received':
       case 'sms.status':
