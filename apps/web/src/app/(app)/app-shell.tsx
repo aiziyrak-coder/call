@@ -28,6 +28,8 @@ import { SoftphoneProvider } from '@/components/softphone/softphone-provider';
 import { SoftphonePanel } from '@/components/softphone/softphone-panel';
 import { LiveTranscriptPanel } from '@/components/ai/live-transcript';
 import { ScreenPop } from '@/components/crm/screen-pop';
+import { WrapUpDialog } from '@/components/crm/wrap-up-dialog';
+import { useCallStore } from '@/lib/stores';
 
 const NAV_ITEMS: Array<{
   href: string;
@@ -48,8 +50,14 @@ const NAV_ITEMS: Array<{
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { user, loading } = useAuthStore();
+  const pendingWrapUpCallId = useCallStore((state) => state.pendingWrapUpCallId);
   const [navOpen, setNavOpen] = useState(false);
   const [phoneOpen, setPhoneOpen] = useState(false);
+  const [wrapUpOpen, setWrapUpOpen] = useState(true);
+
+  useEffect(() => {
+    if (pendingWrapUpCallId) setWrapUpOpen(true);
+  }, [pendingWrapUpCallId]);
 
   useEffect(() => {
     if (!loading && !user) window.location.replace('/login');
@@ -184,7 +192,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               >
                 <Menu className="size-5" strokeWidth={2.25} />
               </button>
-              <OperatorStatusControl />
+              <OperatorStatusControl onOpenWrapUp={() => setWrapUpOpen(true)} />
             </div>
             <div className="flex items-center gap-1.5">
               <button
@@ -237,6 +245,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
 
       <ScreenPop />
+      {pendingWrapUpCallId && wrapUpOpen ? (
+        <WrapUpDialog
+          callId={pendingWrapUpCallId}
+          onDone={() => setWrapUpOpen(false)}
+        />
+      ) : null}
     </SoftphoneProvider>
   );
 }

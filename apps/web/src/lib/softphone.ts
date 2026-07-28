@@ -140,12 +140,23 @@ export class Softphone {
       this.registerer.stateChange.addListener((registererState) => {
         if (registererState === RegistererState.Registered) {
           this.setState(this.session ? this.state : 'registered');
-        } else if (registererState === RegistererState.Terminated) {
-          this.setState('disconnected');
+        } else if (
+          registererState === RegistererState.Unregistered ||
+          registererState === RegistererState.Terminated
+        ) {
+          if (!this.session) this.setState('disconnected');
         }
       });
 
+      // Ulanish timeout — cheksiz "Ulanmoqda" holatidan saqlaydi.
+      const connectWatch = setTimeout(() => {
+        if (this.state === 'connecting') {
+          this.fail("Asterisk ga ulanish vaqti tugadi. Qayta urinib ko'ring.");
+        }
+      }, 15_000);
+
       await this.registerer.register();
+      clearTimeout(connectWatch);
     } catch (error) {
       this.fail(
         `Asterisk ga ulanib bo'lmadi: ${error instanceof Error ? error.message : String(error)}. ` +

@@ -23,6 +23,7 @@ interface SoftphoneContextValue {
   /** Server tomonidagi qo'ng'iroq identifikatori (yozuv, transkripsiya uchun). */
   serverCallId: string | null;
   ready: boolean;
+  extension: string | null;
   dial: (target: string) => Promise<void>;
   answer: () => Promise<void>;
   hangup: () => Promise<void>;
@@ -41,16 +42,33 @@ export function useSoftphone(): SoftphoneContextValue {
   return context;
 }
 
+function phoneDigits(value: string): string {
+  return value.replace(/\D/g, '');
+}
+
+function phonesMatch(a: string, b: string): boolean {
+  const da = phoneDigits(a);
+  const db = phoneDigits(b);
+  if (!da || !db) return false;
+  if (da === db) return true;
+  const short = da.length >= db.length ? db : da;
+  const long = da.length >= db.length ? da : db;
+  return short.length >= 7 && long.endsWith(short);
+}
+
 export function SoftphoneProvider({ children }: { children: ReactNode }) {
   const user = useAuthStore((store) => store.user);
+  const setStatus = useAuthStore((store) => store.setStatus);
   const upsertCall = useCallStore((store) => store.upsertCall);
   const removeCall = useCallStore((store) => store.removeCall);
   const setLastEvent = useCallStore((store) => store.setLastEvent);
   const setCurrentServerCallId = useCallStore((store) => store.setCurrentServerCallId);
+  const setPendingWrapUpCallId = useCallStore((store) => store.setPendingWrapUpCallId);
   const serverCallId = useCallStore((store) => store.currentServerCallId);
 
   const phoneRef = useRef<Softphone | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const softCallRef = useRef<SoftphoneCall | null>(null);
 
   const [state, setState] = useState<SoftphoneState>('disconnected');
   const [call, setCall] = useState<SoftphoneCall | null>(null);
@@ -75,7 +93,10 @@ export function SoftphoneProvider({ children }: { children: ReactNode }) {
     phoneRef.current = phone;
 
     const offState = phone.on('stateChange', setState);
-    const offCall = phone.on('call', setCall);
+    const offCall = phone.on('call', (next) => {
+      softCallRef.current = next;
+      setCall(next);
+    });
     const offError = phone.on('error', (message) => toast.error(message));
 
     return () => {
@@ -93,6 +114,25 @@ export function SoftphoneProvider({ children }: { children: ReactNode }) {
       void phoneRef.current?.disconnect();
     };
   }, [user?.sipExtension, connect]);
+
+  // Sahifa yangilanganda AFTER_CALL_WORK da qolgan operator uchun wrap-upni tiklash.
+  useEffect(() => {
+    if (!user || user.status !== 'AFTER_CALL_WORK') return;
+    if (useCallStore.getState().pendingWrapUpCallId) return;
+
+    void api
+      .get<{ items: Array<{ id: string }> }>('/calls', {
+        query: { page: 1, pageSize: 1 },
+      })
+      .then((page) => {
+        const id = page.items[0]?.id;
+        if (id) {
+          setPendingWrapUpCallId(id);
+          setCurrentServerCallId(id);
+        }
+      })
+      .catch(() => undefined);
+  }, [user?.id, user?.status, setPendingWrapUpCallId, setCurrentServerCallId]);
 
   // Server hodisalari: qo'ng'iroq identifikatorini softfon suhbatiga bog'laymiz.
   useEffect(() => {
@@ -119,30 +159,68 @@ export function SoftphoneProvider({ children }: { children: ReactNode }) {
             hasMediaFork: false,
           };
           upsertCall(active);
-          if (event.operatorId === user.id) setCurrentServerCallId(event.callId);
+
+          const mine = event.operatorId === user.id;
+          const soft = softCallRef.current;
+          const matchesSoft =
+            soft &&
+            (phonesMatch(event.from, soft.remoteNumber) ||
+              phonesMatch(event.to, soft.remoteNumber));
+
+          if (mine || matchesSoft) {
+            setCurrentServerCallId(event.callId);
+            setPendingWrapUpCallId(null);
+            if (mine) setStatus('ON_CALL');
+          }
           break;
         }
-        case 'call.answered':
+        case 'call.answered': {
           upsertCall({
             callId: event.callId,
             state: 'ANSWERED',
             answeredAt: event.answeredAt,
           } as ActiveCall);
+          if (event.operatorId === user.id) {
+            setCurrentServerCallId(event.callId);
+            setStatus('ON_CALL');
+          }
           break;
-        case 'call.ended':
+        }
+        case 'call.ended': {
+          const currentId = useCallStore.getState().currentServerCallId;
+          const active = useCallStore.getState().activeCalls.get(event.callId);
+          const mine =
+            active?.operatorId === user.id || currentId === event.callId;
+
           removeCall(event.callId);
+
+          if (mine) {
+            setPendingWrapUpCallId(event.callId);
+            setCurrentServerCallId(event.callId);
+            setStatus('AFTER_CALL_WORK');
+          }
           break;
+        }
         default:
           break;
       }
     });
-  }, [user, upsertCall, removeCall, setLastEvent, setCurrentServerCallId]);
+  }, [
+    user,
+    upsertCall,
+    removeCall,
+    setLastEvent,
+    setCurrentServerCallId,
+    setPendingWrapUpCallId,
+    setStatus,
+  ]);
 
   const value = useMemo<SoftphoneContextValue>(
     () => ({
       state,
       call,
       serverCallId,
+      extension: user?.sipExtension ?? null,
       ready:
         state === 'registered' ||
         state === 'ringing' ||
@@ -152,6 +230,10 @@ export function SoftphoneProvider({ children }: { children: ReactNode }) {
       dial: async (target: string) => {
         if (!phoneRef.current) {
           toast.error('Softfon ulanmagan');
+          return;
+        }
+        if (state === 'disconnected' || state === 'failed' || state === 'connecting') {
+          toast.error('Softfon hali tayyor emas — registratsiyani kuting');
           return;
         }
         await phoneRef.current.call(target);
@@ -180,7 +262,7 @@ export function SoftphoneProvider({ children }: { children: ReactNode }) {
       },
       reconnect: connect,
     }),
-    [state, call, serverCallId, connect],
+    [state, call, serverCallId, connect, user?.sipExtension],
   );
 
   return (

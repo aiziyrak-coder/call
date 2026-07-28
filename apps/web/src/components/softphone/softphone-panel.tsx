@@ -156,9 +156,11 @@ export function SoftphonePanel() {
           <div
             className={cn(
               'flex size-8 items-center justify-center rounded-full',
-              phone.ready
+              phone.state === 'registered' || inCall || phone.state === 'ringing' || phone.state === 'calling'
                 ? 'bg-[var(--color-positive)]/15 text-[var(--color-positive)]'
-                : 'bg-black/5 text-[var(--color-text-muted)] dark:bg-white/10',
+                : phone.state === 'connecting'
+                  ? 'bg-[var(--color-warning)]/15 text-[var(--color-warning)]'
+                  : 'bg-black/5 text-[var(--color-text-muted)] dark:bg-white/10',
             )}
           >
             {phone.ready ? (
@@ -167,7 +169,15 @@ export function SoftphonePanel() {
               <WifiOff className="size-3.5" strokeWidth={2.25} />
             )}
           </div>
-          <span className="text-[15px] font-semibold tracking-[-0.02em]">Softfon</span>
+          <div className="min-w-0 leading-tight">
+            <span className="text-[15px] font-semibold tracking-[-0.02em]">Softfon</span>
+            {phone.extension ? (
+              <p className="font-mono text-[11px] text-[var(--color-text-muted)]">
+                Ext {phone.extension}
+                {phone.serverCallId ? ` · #${phone.serverCallId.slice(0, 8)}` : ''}
+              </p>
+            ) : null}
+          </div>
         </div>
         <Badge tone={statusBadge.tone} className="rounded-full">
           {statusBadge.text}

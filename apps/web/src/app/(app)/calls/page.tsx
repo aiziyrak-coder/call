@@ -8,6 +8,7 @@ import { api } from '@/lib/api-client';
 import { contactName, formatDuration, formatPhone } from '@/lib/utils';
 import { Badge, Button, Card, EmptyState, Input, Select, Spinner } from '@/components/ui';
 import { CallTranscript } from '@/components/ai/call-transcript';
+import { CallNotesEditor } from '@/components/crm/call-notes-editor';
 import type { CallListItem, Paged } from '@/lib/types';
 
 const RecordingPlayer = dynamic(
@@ -163,12 +164,7 @@ export default function CallsPage() {
                             </p>
                           )}
                           <CallTranscript callId={call.id} />
-                          {call.notes ? (
-                            <p className="text-xs">
-                              <span className="text-[var(--color-text-muted)]">Izoh: </span>
-                              {call.notes}
-                            </p>
-                          ) : null}
+                          <CallNotesEditor callId={call.id} initialNotes={call.notes} />
                           <div className="flex gap-4 text-xs text-[var(--color-text-muted)]">
                             <span>Kutish: {formatDuration(call.waitTimeSec)}</span>
                             <span>Umumiy: {formatDuration(call.durationSec)}</span>

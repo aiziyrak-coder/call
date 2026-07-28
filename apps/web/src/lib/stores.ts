@@ -35,17 +35,22 @@ interface CallState {
   activeCalls: Map<string, ActiveCall>;
   /** Operatorning joriy qo'ng'irog'i uchun server tomonidagi identifikator. */
   currentServerCallId: string | null;
+  /** Tugagan suhbat — wrap-up (ACW) uchun. */
+  pendingWrapUpCallId: string | null;
   lastEvent: AiccEvent | null;
   upsertCall: (call: ActiveCall) => void;
   removeCall: (callId: string) => void;
   replaceAll: (calls: ActiveCall[]) => void;
   setCurrentServerCallId: (callId: string | null) => void;
+  setPendingWrapUpCallId: (callId: string | null) => void;
   setLastEvent: (event: AiccEvent) => void;
+  clearAfterWrapUp: () => void;
 }
 
 export const useCallStore = create<CallState>((set) => ({
   activeCalls: new Map(),
   currentServerCallId: null,
+  pendingWrapUpCallId: null,
   lastEvent: null,
   upsertCall: (call) =>
     set((state) => {
@@ -57,13 +62,13 @@ export const useCallStore = create<CallState>((set) => ({
     set((state) => {
       const next = new Map(state.activeCalls);
       next.delete(callId);
-      return {
-        activeCalls: next,
-        currentServerCallId:
-          state.currentServerCallId === callId ? null : state.currentServerCallId,
-      };
+      // currentServerCallId ni saqlaymiz — ACW / wrap-up / AI panel uchun kerak.
+      return { activeCalls: next };
     }),
   replaceAll: (calls) => set({ activeCalls: new Map(calls.map((call) => [call.callId, call])) }),
   setCurrentServerCallId: (callId) => set({ currentServerCallId: callId }),
+  setPendingWrapUpCallId: (callId) => set({ pendingWrapUpCallId: callId }),
   setLastEvent: (event) => set({ lastEvent: event }),
+  clearAfterWrapUp: () =>
+    set({ pendingWrapUpCallId: null, currentServerCallId: null }),
 }));

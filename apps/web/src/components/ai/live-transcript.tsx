@@ -50,6 +50,7 @@ export function LiveTranscript({ callId }: { callId: string | null }) {
   const [sentiment, setSentiment] = useState<SentimentState | null>(null);
   const [recommendation, setRecommendation] = useState<RecommendationState | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
+  const [waitingTooLong, setWaitingTooLong] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -58,7 +59,18 @@ export function LiveTranscript({ callId }: { callId: string | null }) {
     setSentiment(null);
     setRecommendation(null);
     setSummary(null);
+    setWaitingTooLong(false);
   }, [callId]);
+
+  useEffect(() => {
+    if (!callId) return;
+    if (lines.length > 0 || partial) {
+      setWaitingTooLong(false);
+      return;
+    }
+    const timer = setTimeout(() => setWaitingTooLong(true), 12_000);
+    return () => clearTimeout(timer);
+  }, [callId, lines.length, partial]);
 
   useEffect(() => {
     if (!callId) return;
@@ -134,10 +146,22 @@ export function LiveTranscript({ callId }: { callId: string | null }) {
         }
       />
 
+      {waitingTooLong && visible.length === 0 ? (
+        <div className="mx-4 mb-2 rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-2 text-[12px] text-[var(--color-text-primary)]">
+          AI matn hali kelmadi. Serverda <code className="font-mono text-[11px]">OPENAI_API_KEY</code>{' '}
+          va <code className="font-mono text-[11px]">AI_TRANSCRIPTION_ENABLED=true</code> yoqilganini
+          tekshiring (telephony + ai-worker).
+        </div>
+      ) : null}
+
       {visible.length === 0 ? (
         <EmptyState
           title={callId ? 'Nutq kutilmoqda...' : 'Suhbat boshlanmagan'}
-          hint={callId ? undefined : "Qo'ng'iroq boshlanganda matn shu yerda paydo bo'ladi"}
+          hint={
+            callId
+              ? 'Mikrofon orqali gapiring — matn shu yerda chiqadi'
+              : "Qo'ng'iroq boshlanganda matn shu yerda paydo bo'ladi"
+          }
         />
       ) : (
         <div ref={scrollRef} className="max-h-72 space-y-2 overflow-y-auto px-5 py-3">
@@ -203,7 +227,6 @@ export function LiveTranscript({ callId }: { callId: string | null }) {
 /** Softfon kontekstidagi joriy qo'ng'iroqqa avtomatik ulanadi. */
 export function LiveTranscriptPanel() {
   const { serverCallId } = useSoftphone();
-  if (!serverCallId) return null;
   return <LiveTranscript callId={serverCallId} />;
 }
 

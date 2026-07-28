@@ -49,6 +49,8 @@ export const dealMoveSchema = z.object({
   stageId: z.string().uuid(),
   // Ustun ichidagi yangi o'rni (0 dan boshlanadi).
   position: z.coerce.number().int().min(0),
+  /** LOST bosqichiga o'tkazganda sabab (ixtiyoriy, lekin UI so'raydi). */
+  lostReason: z.string().max(400).optional(),
 });
 
 export const taskWriteSchema = z.object({

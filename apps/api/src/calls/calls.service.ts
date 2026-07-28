@@ -251,6 +251,39 @@ export class CallsService {
     });
   }
 
+  async wrapUp(user: AuthUser, callId: string, outcome: string, notes: string) {
+    await this.assertCallAccess(user, callId, 'call:read:own');
+    const text = notes.trim() ? `[${outcome}] ${notes.trim()}` : `[${outcome}]`;
+    const [call] = await this.prisma.$transaction([
+      this.prisma.call.update({
+        where: { id: callId },
+        data: { notes: text },
+        select: { id: true, notes: true, contactId: true },
+      }),
+      this.prisma.user.update({
+        where: { id: user.id },
+        data: { status: 'AVAILABLE', statusReason: null, statusChangedAt: new Date() },
+      }),
+    ]);
+
+    if (call.contactId) {
+      await this.prisma.activity.create({
+        data: {
+          tenantId: user.tenantId,
+          kind: 'NOTE',
+          contactId: call.contactId,
+          callId: call.id,
+          actorId: user.id,
+          title: `Suhbat yakuni: ${outcome}`,
+          body: notes.trim() || null,
+          metadata: { callId, outcome },
+        },
+      });
+    }
+
+    return { id: call.id, notes: call.notes, status: 'AVAILABLE' as const };
+  }
+
   /**
    * Faol qo'ng'iroq bazada hali bo'lmasligi mumkin (hodisa yetib kelmagan),
    * shuning uchun avval telefoniya servisidan tekshiriladi.

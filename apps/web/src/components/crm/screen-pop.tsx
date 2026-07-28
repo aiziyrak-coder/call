@@ -30,8 +30,7 @@ export function ScreenPop() {
         setPhone(event.direction === 'INBOUND' ? event.from : event.to);
         setDismissed(false);
       }
-      // Suhbat tugagach kartochka o'z-o'zidan yopiladi.
-      if (event.type === 'call.ended') setPhone(null);
+      // ACW davomida kartochka ochiq qoladi — faqat yangi qo'ng'iroq yoki qo'lda yopish.
     });
   }, [user]);
 
@@ -51,7 +50,7 @@ export function ScreenPop() {
       <Card className="fixed bottom-4 right-4 z-40 w-80 animate-sheet-up shadow-[0_20px_50px_oklch(30%_0.04_250_/_0.2)]">
         <div className="flex items-center justify-between gap-2 px-4 py-3">
           <span className="flex items-center gap-2 text-[12px] font-semibold text-[var(--color-brand)]">
-            <PhoneIncoming className="size-3.5" strokeWidth={2.25} /> Kiruvchi qo'ng'iroq
+            <PhoneIncoming className="size-3.5" strokeWidth={2.25} /> Mijoz kartochkasi
           </span>
           <button
             type="button"

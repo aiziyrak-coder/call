@@ -206,6 +206,7 @@ export function Dialog({
   children,
   footer,
   width = 'max-w-lg',
+  dismissible = true,
 }: {
   title: string;
   description?: string;
@@ -213,21 +214,24 @@ export function Dialog({
   children: ReactNode;
   footer?: ReactNode;
   width?: string;
+  /** false — Escape / backdrop / X yopilmaydi (masalan wrap-up). */
+  dismissible?: boolean;
 }) {
   useEffect(() => {
+    if (!dismissible) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, dismissible]);
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center overflow-auto p-6"
       style={{ background: 'oklch(20% 0.02 250 / 0.35)', backdropFilter: 'blur(8px)' }}
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (dismissible && event.target === event.currentTarget) onClose();
       }}
     >
       <div
@@ -246,14 +250,16 @@ export function Dialog({
               <p className="mt-0.5 text-[13px] text-[var(--color-text-muted)]">{description}</p>
             ) : null}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Yopish"
-            className="pressable flex size-9 items-center justify-center rounded-full bg-black/[0.04] text-[var(--color-text-muted)] hover:bg-black/[0.08] dark:bg-white/10"
-          >
-            <X className="size-4" strokeWidth={2.25} />
-          </button>
+          {dismissible ? (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Yopish"
+              className="pressable flex size-9 items-center justify-center rounded-full bg-black/[0.04] text-[var(--color-text-muted)] hover:bg-black/[0.08] dark:bg-white/10"
+            >
+              <X className="size-4" strokeWidth={2.25} />
+            </button>
+          ) : null}
         </div>
 
         <div className="px-5 py-4">{children}</div>

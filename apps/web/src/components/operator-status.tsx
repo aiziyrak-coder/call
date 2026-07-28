@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Coffee, CheckCircle2, PhoneCall, PowerOff, ClipboardList } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api-client';
-import { useAuthStore } from '@/lib/stores';
+import { useAuthStore, useCallStore } from '@/lib/stores';
 import { Badge, Button, Select } from '@/components/ui';
 import type { OperatorStatus as Status } from '@/lib/types';
 
@@ -21,9 +21,14 @@ const STATUS_META: Record<
 
 const BREAK_REASONS = ['Tushlik', 'Qisqa tanaffus', 'Uchrashuv', "O'quv", 'Texnik muammo'];
 
-export function OperatorStatusControl() {
+export function OperatorStatusControl({
+  onOpenWrapUp,
+}: {
+  onOpenWrapUp?: () => void;
+}) {
   const user = useAuthStore((state) => state.user);
   const setStatus = useAuthStore((state) => state.setStatus);
+  const pendingWrapUpCallId = useCallStore((state) => state.pendingWrapUpCallId);
   const [pending, setPending] = useState(false);
   const [showReasons, setShowReasons] = useState(false);
 
@@ -56,6 +61,12 @@ export function OperatorStatusControl() {
         </span>
       </Badge>
 
+      {user.status === 'AFTER_CALL_WORK' && pendingWrapUpCallId && onOpenWrapUp ? (
+        <Button size="sm" className="rounded-full" onClick={onOpenWrapUp}>
+          <ClipboardList className="size-3.5" strokeWidth={2.25} /> Yakunlash
+        </Button>
+      ) : null}
+
       {user.status === 'BREAK' || user.status === 'OFFLINE' ? (
         <Button
           size="sm"
@@ -66,7 +77,7 @@ export function OperatorStatusControl() {
         >
           Ishni boshlash
         </Button>
-      ) : (
+      ) : user.status !== 'ON_CALL' && user.status !== 'AFTER_CALL_WORK' ? (
         <>
           <Button
             size="sm"
@@ -95,7 +106,7 @@ export function OperatorStatusControl() {
             </Select>
           ) : null}
         </>
-      )}
+      ) : null}
     </div>
   );
 }

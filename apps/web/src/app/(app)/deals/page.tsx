@@ -10,12 +10,18 @@ import { api } from '@/lib/api-client';
 import { useAuthStore } from '@/lib/stores';
 import { cn, contactName, formatMoney } from '@/lib/utils';
 import type { Deal, PipelineBoard } from '@/lib/types';
-import { Badge, Button, EmptyState, Spinner } from '@/components/ui';
+import { Badge, Button, Dialog, EmptyState, Field, Spinner, Textarea } from '@/components/ui';
 import { DealFormDialog } from '@/components/crm/deal-form-dialog';
 
 interface DragState {
   dealId: string;
   fromStageId: string;
+}
+
+interface PendingMove {
+  id: string;
+  stageId: string;
+  position: number;
 }
 
 export default function DealsPage() {
@@ -25,6 +31,8 @@ export default function DealsPage() {
   const [drag, setDrag] = useState<DragState | null>(null);
   const [dropTarget, setDropTarget] = useState<{ stageId: string; index: number } | null>(null);
   const [creating, setCreating] = useState(false);
+  const [lostPrompt, setLostPrompt] = useState<PendingMove | null>(null);
+  const [lostReason, setLostReason] = useState('');
 
   const canWrite = user ? hasPermission(user.roles, 'deal:write') : false;
 
@@ -34,9 +42,17 @@ export default function DealsPage() {
   });
 
   const move = useMutation({
-    mutationFn: ({ id, stageId, position }: { id: string; stageId: string; position: number }) =>
-      api.post<Deal>(`/deals/${id}/move`, { stageId, position }),
-    // Optimistik yangilash: kartochka sichqoncha qo'yib yuborilishi bilan joyiga tushadi.
+    mutationFn: ({
+      id,
+      stageId,
+      position,
+      lostReason: reason,
+    }: {
+      id: string;
+      stageId: string;
+      position: number;
+      lostReason?: string;
+    }) => api.post<Deal>(`/deals/${id}/move`, { stageId, position, lostReason: reason }),
     onMutate: async ({ id, stageId, position }) => {
       await queryClient.cancelQueries({ queryKey: ['deals', 'board'] });
       const previous = queryClient.getQueryData<PipelineBoard>(['deals', 'board']);
@@ -87,12 +103,20 @@ export default function DealsPage() {
     if (!drag) return;
     const sourceStage = board.data?.stages.find((stage) => stage.id === drag.fromStageId);
     const fromIndex = sourceStage?.deals.findIndex((deal) => deal.id === drag.dealId) ?? -1;
-    // Server siblings ro'yxatida dragged kartochka yo'q — pastga tortganda indeksni tuzatamiz.
     const position =
       drag.fromStageId === stageId && fromIndex >= 0 && fromIndex < index ? index - 1 : index;
+    const dealId = drag.dealId;
     setDrag(null);
     setDropTarget(null);
-    move.mutate({ id: drag.dealId, stageId, position: Math.max(0, position) });
+
+    const targetStage = board.data?.stages.find((stage) => stage.id === stageId);
+    if (targetStage?.kind === 'LOST') {
+      setLostReason('');
+      setLostPrompt({ id: dealId, stageId, position: Math.max(0, position) });
+      return;
+    }
+
+    move.mutate({ id: dealId, stageId, position: Math.max(0, position) });
   };
 
   return (
@@ -189,6 +213,11 @@ export default function DealsPage() {
                           {contactName(deal.contact)}
                         </Link>
                       ) : null}
+                      {deal.lostReason ? (
+                        <p className="mt-1 truncate text-[11px] text-[var(--color-negative)]">
+                          {deal.lostReason}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
 
@@ -203,7 +232,7 @@ export default function DealsPage() {
 
               {stage.deals.length === 0 ? (
                 <p className="px-1 py-6 text-center text-xs text-[var(--color-text-muted)]">
-                  Bo'sh
+                  Bo&apos;sh
                 </p>
               ) : null}
             </div>
@@ -220,6 +249,43 @@ export default function DealsPage() {
             void queryClient.invalidateQueries({ queryKey: ['deals', 'board'] });
           }}
         />
+      ) : null}
+
+      {lostPrompt ? (
+        <Dialog
+          title="Yo'qotish sababi"
+          description="Bitim yo'qotilgan bosqichga o'tkazilmoqda"
+          onClose={() => setLostPrompt(null)}
+          width="max-w-md"
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setLostPrompt(null)}>
+                Bekor
+              </Button>
+              <Button
+                onClick={() => {
+                  move.mutate({
+                    ...lostPrompt,
+                    lostReason: lostReason.trim() || undefined,
+                  });
+                  setLostPrompt(null);
+                }}
+              >
+                Saqlash
+              </Button>
+            </>
+          }
+        >
+          <Field label="Sabab">
+            <Textarea
+              rows={3}
+              value={lostReason}
+              onChange={(event) => setLostReason(event.target.value)}
+              placeholder="Masalan: narx, raqobat, aloqa uzildi..."
+              autoFocus
+            />
+          </Field>
+        </Dialog>
       ) : null}
     </div>
   );

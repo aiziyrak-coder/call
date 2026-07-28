@@ -205,6 +205,12 @@ export class DealsService {
                   stageId: stage.id,
                   // WON/LOST bosqichiga tushgan bitim yopilgan hisoblanadi.
                   closedAt: stage.kind === 'OPEN' ? null : new Date(),
+                  lostReason:
+                    stage.kind === 'LOST'
+                      ? (input.lostReason?.trim() || null)
+                      : stage.kind === 'OPEN' || stage.kind === 'WON'
+                        ? null
+                        : undefined,
                 }
               : { position },
         });

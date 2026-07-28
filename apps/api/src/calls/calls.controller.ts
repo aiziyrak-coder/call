@@ -48,6 +48,22 @@ class SpyDto extends createZodDto(spySchema) {}
 const noteSchema = z.object({ notes: z.string().max(4000) });
 class NoteDto extends createZodDto(noteSchema) {}
 
+const WRAP_UP_OUTCOMES = [
+  'SOLD',
+  'CALLBACK',
+  'INFO',
+  'COMPLAINT',
+  'NO_INTEREST',
+  'WRONG_NUMBER',
+  'OTHER',
+] as const;
+
+const wrapUpSchema = z.object({
+  outcome: z.enum(WRAP_UP_OUTCOMES),
+  notes: z.string().max(4000).optional().default(''),
+});
+class WrapUpDto extends createZodDto(wrapUpSchema) {}
+
 @ApiTags('calls')
 @Controller('calls')
 export class CallsController {
@@ -175,5 +191,14 @@ export class CallsController {
   @RequirePermissions('call:read:own', 'call:read:all')
   notes(@CurrentUser() user: AuthUser, @Param('callId') callId: string, @Body() dto: NoteDto) {
     return this.calls.addNote(user, callId, dto.notes);
+  }
+
+  @Post(':callId/wrap-up')
+  @HttpCode(200)
+  @RequirePermissions('call:read:own', 'call:read:all')
+  @Audit('call.wrap_up', 'call')
+  @ApiOperation({ summary: "Qo'ng'iroqdan keyin natija + izoh, operatorni Bo'sh qiladi" })
+  wrapUp(@CurrentUser() user: AuthUser, @Param('callId') callId: string, @Body() dto: WrapUpDto) {
+    return this.calls.wrapUp(user, callId, dto.outcome, dto.notes ?? '');
   }
 }
