@@ -26,7 +26,6 @@ export const tokenStore = {
     return null;
   },
   set(access: string, _refresh?: string): void {
-    // Prod brauzerda JSON access kelmaydi — cookie yetarli.
     if (access) memoryAccessToken = access;
   },
   clear(): void {
@@ -35,9 +34,15 @@ export const tokenStore = {
 };
 
 let refreshInFlight: Promise<boolean> | null = null;
+const REFRESH_LOCK_CHANNEL =
+  typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('aicc-auth-refresh') : null;
 
-async function refreshTokens(): Promise<boolean> {
-  refreshInFlight ??= (async () => {
+/** Bir tab refresh qilayotganda boshqalari kutadi — refresh token oilasini buzmaslik. */
+export async function refreshTokens(): Promise<boolean> {
+  if (refreshInFlight) return refreshInFlight;
+
+  refreshInFlight = (async () => {
+    REFRESH_LOCK_CHANNEL?.postMessage({ type: 'refresh-start' });
     try {
       const response = await fetch(`${API_BASE}${API_PREFIX}/auth/refresh`, {
         method: 'POST',
@@ -47,12 +52,15 @@ async function refreshTokens(): Promise<boolean> {
       });
       if (!response.ok) {
         tokenStore.clear();
+        REFRESH_LOCK_CHANNEL?.postMessage({ type: 'refresh-fail' });
         return false;
       }
       const data = (await response.json()) as { accessToken?: string; expiresIn?: number };
       if (data.accessToken) tokenStore.set(data.accessToken);
+      REFRESH_LOCK_CHANNEL?.postMessage({ type: 'refresh-ok' });
       return true;
     } catch {
+      REFRESH_LOCK_CHANNEL?.postMessage({ type: 'refresh-fail' });
       return false;
     } finally {
       setTimeout(() => {
@@ -64,6 +72,36 @@ async function refreshTokens(): Promise<boolean> {
   return refreshInFlight;
 }
 
+if (REFRESH_LOCK_CHANNEL) {
+  REFRESH_LOCK_CHANNEL.addEventListener('message', (event: MessageEvent) => {
+    const data = event.data as { type?: string } | undefined;
+    if (data?.type === 'refresh-start' && !refreshInFlight) {
+      // Boshqa tab refresh qilmoqda — shu tab ham shu promise ni kutishi uchun
+      // qisqa "kutish" flagni qo'yamiz (haqiqiy so'rov yubormaymiz).
+      refreshInFlight = new Promise((resolve) => {
+        const onDone = (next: MessageEvent) => {
+          const payload = next.data as { type?: string } | undefined;
+          if (payload?.type === 'refresh-ok') {
+            REFRESH_LOCK_CHANNEL?.removeEventListener('message', onDone);
+            refreshInFlight = null;
+            resolve(true);
+          } else if (payload?.type === 'refresh-fail') {
+            REFRESH_LOCK_CHANNEL?.removeEventListener('message', onDone);
+            refreshInFlight = null;
+            resolve(false);
+          }
+        };
+        REFRESH_LOCK_CHANNEL?.addEventListener('message', onDone);
+        setTimeout(() => {
+          REFRESH_LOCK_CHANNEL?.removeEventListener('message', onDone);
+          refreshInFlight = null;
+          resolve(false);
+        }, 8_000);
+      });
+    }
+  });
+}
+
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: unknown;
@@ -73,30 +111,24 @@ export interface RequestOptions {
   anonymous?: boolean;
 }
 
-export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+function buildUrl(path: string, query?: RequestOptions['query']): URL {
   const url = new URL(`${API_BASE}${API_PREFIX}${path}`);
-  for (const [key, value] of Object.entries(options.query ?? {})) {
+  for (const [key, value] of Object.entries(query ?? {})) {
     if (value === undefined || value === null || value === '') continue;
     url.searchParams.set(key, String(value));
   }
+  return url;
+}
 
-  const send = async (): Promise<Response> =>
-    fetch(url, {
-      method: options.method ?? 'GET',
-      credentials: 'include',
-      headers: {
-        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-        ...(options.anonymous || !tokenStore.access
-          ? {}
-          : { Authorization: `Bearer ${tokenStore.access}` }),
-      },
-      body: options.body ? JSON.stringify(options.body) : undefined,
-      signal: options.signal,
-    });
+function authHeaders(anonymous?: boolean): HeadersInit {
+  return {
+    ...(anonymous || !tokenStore.access ? {} : { Authorization: `Bearer ${tokenStore.access}` }),
+  };
+}
 
+async function withAuthRetry(send: () => Promise<Response>, anonymous?: boolean): Promise<Response> {
   let response = await send();
-
-  if (response.status === 401 && !options.anonymous) {
+  if (response.status === 401 && !anonymous) {
     const refreshed = await refreshTokens();
     if (refreshed) {
       response = await send();
@@ -104,6 +136,26 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       window.location.href = '/login';
     }
   }
+  return response;
+}
+
+export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const url = buildUrl(path, options.query);
+
+  const response = await withAuthRetry(
+    () =>
+      fetch(url, {
+        method: options.method ?? 'GET',
+        credentials: 'include',
+        headers: {
+          ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+          ...authHeaders(options.anonymous),
+        },
+        body: options.body ? JSON.stringify(options.body) : undefined,
+        signal: options.signal,
+      }),
+    options.anonymous,
+  );
 
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as {
@@ -120,6 +172,31 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   if (response.status === 204) return undefined as T;
   const text = await response.text();
   return (text ? JSON.parse(text) : undefined) as T;
+}
+
+/** CSV / audio kabi binary javoblar — 401 da refresh qiladi. */
+export async function fetchBlob(path: string, options: Omit<RequestOptions, 'body'> = {}): Promise<Blob> {
+  const url = buildUrl(path, options.query);
+  const response = await withAuthRetry(
+    () =>
+      fetch(url, {
+        method: options.method ?? 'GET',
+        credentials: 'include',
+        headers: authHeaders(options.anonymous),
+        signal: options.signal,
+      }),
+    options.anonymous,
+  );
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+    throw new ApiError(
+      payload?.message ?? `So'rov muvaffaqiyatsiz (${response.status})`,
+      response.status,
+    );
+  }
+
+  return response.blob();
 }
 
 export const api = {

@@ -310,21 +310,28 @@ export class Softphone {
     });
   }
 
-  /** Ko'r-ko'rona transfer: suhbat boshqa raqamga uzatiladi. */
-  async transfer(target: string): Promise<void> {
+  /** Ko'r-ko'rona transfer: suhbat boshqa raqamga uzatiladi. Muvaffaqiyat = true. */
+  async transfer(target: string): Promise<boolean> {
     const session = this.session;
-    if (!session || session.state !== SessionState.Established || !this.userAgent) return;
+    if (!session || session.state !== SessionState.Established || !this.userAgent) {
+      this.emit('error', 'Transfer uchun faol suhbat yo‘q');
+      return false;
+    }
 
     const domain = this.userAgent.configuration.uri?.host ?? 'aicc.local';
     const uri = UserAgent.makeURI(`sip:${target}@${domain}`);
     if (!uri) {
       this.emit('error', `Transfer manzili noto'g'ri: ${target}`);
-      return;
+      return false;
     }
 
-    await session.refer(uri).catch((error: Error) => {
-      this.emit('error', `Transfer amalga oshmadi: ${error.message}`);
-    });
+    try {
+      await session.refer(uri);
+      return true;
+    } catch (error) {
+      this.emit('error', `Transfer amalga oshmadi: ${error instanceof Error ? error.message : String(error)}`);
+      return false;
+    }
   }
 
   // ---------------------------------------------------------------------------

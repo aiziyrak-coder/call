@@ -85,9 +85,14 @@ export default function DealsPage() {
 
   const drop = (stageId: string, index: number) => {
     if (!drag) return;
+    const sourceStage = board.data?.stages.find((stage) => stage.id === drag.fromStageId);
+    const fromIndex = sourceStage?.deals.findIndex((deal) => deal.id === drag.dealId) ?? -1;
+    // Server siblings ro'yxatida dragged kartochka yo'q — pastga tortganda indeksni tuzatamiz.
+    const position =
+      drag.fromStageId === stageId && fromIndex >= 0 && fromIndex < index ? index - 1 : index;
     setDrag(null);
     setDropTarget(null);
-    move.mutate({ id: drag.dealId, stageId, position: index });
+    move.mutate({ id: drag.dealId, stageId, position: Math.max(0, position) });
   };
 
   return (

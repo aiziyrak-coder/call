@@ -29,10 +29,10 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
 };
 
 const BUTTON_SIZES: Record<ButtonSize, string> = {
-  sm: 'h-8 px-3 text-xs',
-  md: 'h-10 px-4 text-sm',
-  lg: 'h-12 px-6 text-base',
-  icon: 'h-10 w-10',
+  sm: 'min-h-11 h-11 px-3 text-xs sm:min-h-8 sm:h-8',
+  md: 'min-h-11 h-11 px-4 text-sm sm:min-h-10 sm:h-10',
+  lg: 'min-h-12 h-12 px-6 text-base',
+  icon: 'min-h-11 min-w-11 h-11 w-11',
 };
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -156,11 +156,20 @@ export function Badge({
   );
 }
 
-export function EmptyState({ title, hint }: { title: string; hint?: string }) {
+export function EmptyState({
+  title,
+  hint,
+  action,
+}: {
+  title: string;
+  hint?: string;
+  action?: ReactNode;
+}) {
   return (
-    <div className="flex flex-col items-center justify-center gap-1 px-6 py-12 text-center">
+    <div className="flex flex-col items-center justify-center gap-3 px-6 py-12 text-center">
       <p className="text-sm font-medium text-[var(--color-text-primary)]">{title}</p>
-      {hint ? <p className="text-xs text-[var(--color-text-muted)]">{hint}</p> : null}
+      {hint ? <p className="max-w-sm text-xs text-[var(--color-text-muted)]">{hint}</p> : null}
+      {action ? <div className="mt-1">{action}</div> : null}
     </div>
   );
 }

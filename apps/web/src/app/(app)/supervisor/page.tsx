@@ -181,15 +181,37 @@ export default function SupervisorPage() {
                     </span>
 
                     {canListen ? (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() =>
-                          toast.info('Tinglash 2-bosqichda AI moduli bilan birga yoqiladi')
-                        }
-                      >
-                        <Ear className="size-4" /> Tinglash
-                      </Button>
+                      <div className="flex flex-wrap gap-1">
+                        {(
+                          [
+                            { mode: 'listen' as const, label: 'Tinglash', icon: Ear },
+                            { mode: 'whisper' as const, label: 'Whisper', icon: MessageCircle },
+                            { mode: 'barge' as const, label: 'Barge', icon: PhoneCall },
+                          ] as const
+                        )
+                          .filter((item) =>
+                            item.mode === 'listen'
+                              ? hasPermission(user!.roles, 'call:listen')
+                              : item.mode === 'whisper'
+                                ? hasPermission(user!.roles, 'call:whisper')
+                                : hasPermission(user!.roles, 'call:barge'),
+                          )
+                          .map(({ mode, label, icon: Icon }) => (
+                            <Button
+                              key={mode}
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                void api
+                                  .post(`/calls/${call.id}/spy`, { mode })
+                                  .then(() => toast.success(`${label} yoqildi`))
+                                  .catch((error: Error) => toast.error(error.message));
+                              }}
+                            >
+                              <Icon className="size-4" /> {label}
+                            </Button>
+                          ))}
+                      </div>
                     ) : null}
                   </li>
                 );

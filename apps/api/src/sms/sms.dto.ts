@@ -2,26 +2,36 @@ import { z } from 'zod';
 import { createZodDto } from '../common/zod';
 import { paginationSchema } from '../common/pagination';
 
-export const sendSmsSchema = z.object({
-  // Raqam serverda E.164 ga keltiriladi, shuning uchun erkin format qabul qilinadi.
-  to: z.string().min(3),
-  text: z.string().min(1).max(1600),
-  contactId: z.string().uuid().optional(),
-  deviceId: z.string().uuid().optional(),
-  simSlot: z.coerce.number().int().min(0).max(3).optional(),
-  templateId: z.string().uuid().optional(),
-  /** Shablondagi `{{ism}}` kabi o'zgaruvchilar. */
-  variables: z.record(z.string()).optional(),
-});
+export const sendSmsSchema = z
+  .object({
+    // Raqam serverda E.164 ga keltiriladi, shuning uchun erkin format qabul qilinadi.
+    to: z.string().min(3),
+    text: z.string().min(1).max(1600).optional(),
+    contactId: z.string().uuid().optional(),
+    deviceId: z.string().uuid().optional(),
+    simSlot: z.coerce.number().int().min(0).max(3).optional(),
+    templateId: z.string().uuid().optional(),
+    /** Shablondagi `{{ism}}` kabi o'zgaruvchilar. */
+    variables: z.record(z.string()).optional(),
+  })
+  .refine((data) => Boolean(data.text?.trim() || data.templateId), {
+    message: "Matn yoki shablon ko'rsatilishi kerak",
+    path: ['text'],
+  });
 
-export const bulkSmsSchema = z.object({
-  text: z.string().min(1).max(1600).optional(),
-  templateId: z.string().uuid().optional(),
-  /** Aniq kontaktlar ro'yxati yoki teg bo'yicha segment. */
-  contactIds: z.array(z.string().uuid()).max(5000).optional(),
-  tag: z.string().max(40).optional(),
-  variables: z.record(z.string()).optional(),
-});
+export const bulkSmsSchema = z
+  .object({
+    text: z.string().min(1).max(1600).optional(),
+    templateId: z.string().uuid().optional(),
+    /** Aniq kontaktlar ro'yxati yoki teg bo'yicha segment. */
+    contactIds: z.array(z.string().uuid()).max(5000).optional(),
+    tag: z.string().max(40).optional(),
+    variables: z.record(z.string()).optional(),
+  })
+  .refine((data) => Boolean(data.text?.trim() || data.templateId), {
+    message: "Matn yoki shablon ko'rsatilishi kerak",
+    path: ['text'],
+  });
 
 export const smsListSchema = paginationSchema.extend({
   direction: z.enum(['INBOUND', 'OUTBOUND']).optional(),

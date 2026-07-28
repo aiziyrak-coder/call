@@ -46,14 +46,19 @@ export function DealFormDialog({
     pipelines.data?.[0];
 
   const save = useMutation({
-    mutationFn: (): Promise<Deal> =>
-      api.post<Deal>('/deals', {
+    mutationFn: (): Promise<Deal> => {
+      const parsedAmount = amount.trim() ? Number(amount) : undefined;
+      if (parsedAmount !== undefined && !Number.isFinite(parsedAmount)) {
+        throw new Error("Summa noto'g'ri");
+      }
+      return api.post<Deal>('/deals', {
         title: title.trim(),
-        amount: amount ? Number(amount) : undefined,
+        amount: parsedAmount,
         contactId: selectedContact || undefined,
         pipelineId: pipeline?.id,
         stageId: stageId || undefined,
-      }),
+      });
+    },
     onSuccess: (deal) => {
       toast.success('Bitim yaratildi');
       onSaved(deal);

@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, Download, Plus, Search, Upload, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { hasPermission } from '@aicc/shared';
-import { api, tokenStore } from '@/lib/api-client';
+import { api, fetchBlob } from '@/lib/api-client';
 import { useAuthStore } from '@/lib/stores';
 import { contactName, formatPhone, timeAgo } from '@/lib/utils';
 import type { Contact, DuplicateGroup, ImportResult, Paged } from '@/lib/types';
@@ -64,23 +64,17 @@ export default function ContactsPage() {
   const duplicateCount = duplicates.data?.length ?? 0;
 
   const exportCsv = async () => {
-    // Fayl yuklab olish uchun `fetch` orqali blob olamiz — `api` JSON kutadi.
-    const base = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
-    const response = await fetch(`${base}/api/v1/contacts/export`, {
-      credentials: 'include',
-      headers: tokenStore.access ? { Authorization: `Bearer ${tokenStore.access}` } : {},
-    });
-    if (!response.ok) {
+    try {
+      const blob = await fetchBlob('/contacts/export');
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'aicc-contacts.csv';
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
       toast.error("Eksport qilib bo'lmadi");
-      return;
     }
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'aicc-contacts.csv';
-    link.click();
-    URL.revokeObjectURL(url);
   };
 
   const rows = useMemo(() => contacts.data?.items ?? [], [contacts.data]);
@@ -183,6 +177,13 @@ export default function ContactsPage() {
           <EmptyState
             title="Kartochka topilmadi"
             hint={search ? "Boshqa so'rov bilan qidirib ko'ring" : "Birinchi mijozni qo'shing"}
+            action={
+              !search && canWrite ? (
+                <Button size="sm" onClick={() => setCreating(true)}>
+                  Yangi mijoz
+                </Button>
+              ) : undefined
+            }
           />
         ) : (
           <table className="w-full text-sm">

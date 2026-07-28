@@ -20,6 +20,7 @@ import { api } from '@/lib/api-client';
 import { cn, formatDuration, formatPhone } from '@/lib/utils';
 import { Badge, Button, Card, Input, Select } from '@/components/ui';
 import { useSoftphone } from './softphone-provider';
+import { useAuthStore } from '@/lib/stores';
 import type { Colleague } from '@/lib/types';
 
 const DIALPAD_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'] as const;
@@ -40,6 +41,7 @@ const STATE_LABELS: Record<
 
 export function SoftphonePanel() {
   const phone = useSoftphone();
+  const user = useAuthStore((state) => state.user);
   const [dialValue, setDialValue] = useState('');
   const [showDialpad, setShowDialpad] = useState(false);
   const [transferTarget, setTransferTarget] = useState('');
@@ -77,6 +79,7 @@ export function SoftphonePanel() {
    * uchun input/textarea fokusda bo'lganda o'tkazib yuboriladi.
    */
   useEffect(() => {
+    if (!user?.sipExtension) return;
     const handler = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       const typing =
@@ -88,7 +91,8 @@ export function SoftphonePanel() {
       if (event.key === 'F9') {
         event.preventDefault();
         if (phone.state === 'ringing') void phone.answer();
-        else if (dialValue) void phone.dial(dialValue);
+        else if (dialValue && phone.ready) void phone.dial(dialValue);
+        else if (dialValue && !phone.ready) toast.error('Softfon ulanmagan');
         return;
       }
       if (event.key === 'F10') {
@@ -110,12 +114,23 @@ export function SoftphonePanel() {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [phone, dialValue]);
+  }, [phone, dialValue, user?.sipExtension]);
 
   const statusBadge = useMemo(
     () => STATE_LABELS[phone.state] ?? STATE_LABELS.disconnected!,
     [phone.state],
   );
+
+  if (!user?.sipExtension) {
+    return (
+      <Card className="flex w-full flex-col overflow-hidden p-4">
+        <p className="text-sm font-semibold">Softfon</p>
+        <p className="mt-2 text-xs text-[var(--color-text-muted)]">
+          SIP raqami biriktirilmagan. Softfon uchun administrator sozlamalaridan raqam bering.
+        </p>
+      </Card>
+    );
+  }
 
   const pressDigit = (digit: string) => {
     if (inCall) {
@@ -127,7 +142,8 @@ export function SoftphonePanel() {
 
   const handleTransfer = async () => {
     if (!transferTarget) return;
-    await phone.transfer(transferTarget);
+    const ok = await phone.transfer(transferTarget);
+    if (!ok) return;
     setShowTransfer(false);
     setTransferTarget('');
     toast.success('Transfer yuborildi');

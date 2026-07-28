@@ -29,7 +29,7 @@ pnpm dev               # barcha servislar
 ```
 
 Standart portlar: web `3000`, API `4000`, telephony `4100`, ai-worker `4200`,
-Asterisk ARI `8088`, Asterisk WSS `8089`, MinIO konsoli `9001`.
+Asterisk ARI `8088`, Asterisk WSS `8089`, MinIO API `9010`, MinIO konsoli `9011`.
 
 ### STT motorini yoqish
 

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Download, Gauge, Pause, Play } from 'lucide-react';
 import { toast } from 'sonner';
-import { api } from '@/lib/api-client';
+import { fetchBlob } from '@/lib/api-client';
 import { formatDuration } from '@/lib/utils';
 import { Button } from '@/components/ui';
 
@@ -15,11 +15,12 @@ interface RecordingPlayerProps {
 }
 
 /**
- * Yozuv MinIO da shifrlangan holda turadi, shuning uchun brauzer to'g'ridan-to'g'ri
- * emas, API bergan qisqa muddatli imzolangan havola orqali oladi.
+ * Yozuv cookie-auth orqali yuklanadi va blob URL ga aylantiriladi —
+ * cross-origin <audio src> cookie/CORP muammolaridan qochish uchun.
  */
 export function RecordingPlayer({ callId, recording }: RecordingPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const blobUrlRef = useRef<string | null>(null);
   const [url, setUrl] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const [position, setPosition] = useState(0);
@@ -30,15 +31,23 @@ export function RecordingPlayer({ callId, recording }: RecordingPlayerProps) {
     if (audioRef.current) audioRef.current.playbackRate = speed;
   }, [speed, url]);
 
+  useEffect(
+    () => () => {
+      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+    },
+    [],
+  );
+
   const ensureUrl = async (): Promise<string | null> => {
     if (url) return url;
     setLoading(true);
     try {
-      const result = await api.get<{ url: string; expiresInSec: number }>(
-        `/recordings/${callId}/url`,
-      );
-      setUrl(result.url);
-      return result.url;
+      const blob = await fetchBlob(`/recordings/${callId}/stream`);
+      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+      const objectUrl = URL.createObjectURL(blob);
+      blobUrlRef.current = objectUrl;
+      setUrl(objectUrl);
+      return objectUrl;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Yozuvni ochib bo'lmadi");
       return null;
@@ -63,7 +72,11 @@ export function RecordingPlayer({ callId, recording }: RecordingPlayerProps) {
 
   const download = async () => {
     const source = await ensureUrl();
-    if (source) window.open(source, '_blank', 'noopener');
+    if (!source) return;
+    const link = document.createElement('a');
+    link.href = source;
+    link.download = `aicc-${callId}.${recording.format || 'wav'}`;
+    link.click();
   };
 
   const total = recording.durationSec || audioRef.current?.duration || 0;

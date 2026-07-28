@@ -1,14 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import dynamic from 'next/dynamic';
+import { Fragment, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowDownLeft, ArrowUpRight, Search } from 'lucide-react';
 import { api } from '@/lib/api-client';
 import { contactName, formatDuration, formatPhone } from '@/lib/utils';
 import { Badge, Button, Card, EmptyState, Input, Select, Spinner } from '@/components/ui';
-import { RecordingPlayer } from '@/components/recording-player';
 import { CallTranscript } from '@/components/ai/call-transcript';
 import type { CallListItem, Paged } from '@/lib/types';
+
+const RecordingPlayer = dynamic(
+  () => import('@/components/recording-player').then((mod) => mod.RecordingPlayer),
+  { ssr: false, loading: () => <Spinner className="size-4 text-[var(--color-brand)]" /> },
+);
 
 const DISPOSITION_TONES: Record<string, 'positive' | 'negative' | 'warning' | 'neutral'> = {
   ANSWERED: 'positive',
@@ -111,9 +116,8 @@ export default function CallsPage() {
             </thead>
             <tbody className="divide-y divide-[var(--color-border-subtle)]">
               {items.map((call) => (
-                <>
+                <Fragment key={call.id}>
                   <tr
-                    key={call.id}
                     onClick={() => setExpanded(expanded === call.id ? null : call.id)}
                     className="cursor-pointer transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.03]"
                   >
@@ -148,7 +152,7 @@ export default function CallsPage() {
                     </td>
                   </tr>
                   {expanded === call.id ? (
-                    <tr key={`${call.id}-detail`}>
+                    <tr>
                       <td colSpan={6} className="bg-black/[0.02] px-4 py-3 dark:bg-white/[0.03]">
                         <div className="space-y-3">
                           {call.recording ? (
@@ -174,7 +178,7 @@ export default function CallsPage() {
                       </td>
                     </tr>
                   ) : null}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>

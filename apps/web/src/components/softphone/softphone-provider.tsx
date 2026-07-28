@@ -29,7 +29,7 @@ interface SoftphoneContextValue {
   toggleHold: () => Promise<void>;
   toggleMute: () => void;
   sendDtmf: (digit: string) => void;
-  transfer: (target: string) => Promise<void>;
+  transfer: (target: string) => Promise<boolean>;
   reconnect: () => Promise<void>;
 }
 
@@ -150,7 +150,11 @@ export function SoftphoneProvider({ children }: { children: ReactNode }) {
         state === 'active' ||
         state === 'held',
       dial: async (target: string) => {
-        await phoneRef.current?.call(target);
+        if (!phoneRef.current) {
+          toast.error('Softfon ulanmagan');
+          return;
+        }
+        await phoneRef.current.call(target);
       },
       answer: async () => {
         await phoneRef.current?.answer();
@@ -168,7 +172,11 @@ export function SoftphoneProvider({ children }: { children: ReactNode }) {
       },
       sendDtmf: (digit: string) => phoneRef.current?.sendDtmf(digit),
       transfer: async (target: string) => {
-        await phoneRef.current?.transfer(target);
+        if (!phoneRef.current) {
+          toast.error('Softfon ulanmagan');
+          return false;
+        }
+        return phoneRef.current.transfer(target);
       },
       reconnect: connect,
     }),

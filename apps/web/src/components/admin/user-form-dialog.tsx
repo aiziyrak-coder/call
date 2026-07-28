@@ -16,6 +16,20 @@ const ROLE_LABEL: Record<Role, string> = {
   AI_AGENT: 'AI-agent',
 };
 
+function isStrongPassword(value: string): boolean {
+  return (
+    value.length >= 10 &&
+    value.length <= 72 &&
+    /[a-z]/.test(value) &&
+    /[A-Z]/.test(value) &&
+    /\d/.test(value)
+  );
+}
+
+function isValidSip(value: string): boolean {
+  return value === '' || /^\d{3,6}$/.test(value);
+}
+
 export function UserFormDialog({
   user,
   onClose,
@@ -59,10 +73,14 @@ export function UserFormDialog({
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const passwordOk = user ? !password || isStrongPassword(password) : isStrongPassword(password);
+  const sipOk = isValidSip(sipExtension.trim());
   const valid =
     fullName.trim().length > 0 &&
     roles.length > 0 &&
-    (user ? true : email.trim().length > 3 && password.length >= 8);
+    passwordOk &&
+    sipOk &&
+    (user ? true : email.trim().length > 3);
 
   return (
     <Dialog
@@ -96,24 +114,30 @@ export function UserFormDialog({
 
         <Field
           label={user ? 'Yangi parol' : 'Parol'}
-          hint={user ? "Bo'sh qoldirilsa o'zgarmaydi" : 'Kamida 8 belgi'}
+          hint={
+            user
+              ? "Bo'sh qoldirilsa o'zgarmaydi. Aks holda: 10+ belgi, katta/kichik harf va raqam"
+              : 'Kamida 10 belgi, katta va kichik harf, raqam'
+          }
         >
           <Input
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
+            aria-invalid={password.length > 0 && !passwordOk}
           />
         </Field>
 
         <Field
           label="SIP raqami"
-          hint="Brauzer softfoni shu raqam bilan ro'yxatdan o'tadi. Bo'sh qoldirilsa softfon o'chadi."
+          hint="3–6 raqam. Bo'sh qoldirilsa softfon o'chadi."
         >
           <Input
             inputMode="numeric"
             value={sipExtension}
             onChange={(event) => setSipExtension(event.target.value)}
             placeholder="1001"
+            aria-invalid={!sipOk}
           />
         </Field>
 
