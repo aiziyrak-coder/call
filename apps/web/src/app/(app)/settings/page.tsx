@@ -22,6 +22,7 @@ import { UsersTab } from '@/components/admin/users-tab';
 import { QueuesTab } from '@/components/admin/queues-tab';
 import { DevicesTab } from '@/components/admin/devices-tab';
 import { AuditTab } from '@/components/admin/audit-tab';
+import { CompanionDownloadCard } from '@/components/settings/companion-download-card';
 
 type TabKey = 'business' | 'users' | 'phone' | 'queues' | 'audit' | 'profile';
 
@@ -183,6 +184,8 @@ function PhoneTab({ showManage }: { showManage: boolean }) {
 
   return (
     <div className="space-y-4">
+      <CompanionDownloadCard />
+
       <Card className="p-5">
         <div className="flex gap-3">
           <div className="flex size-10 items-center justify-center rounded-[0.9rem] bg-[var(--color-brand)]/12 text-[var(--color-brand)]">
@@ -191,16 +194,9 @@ function PhoneTab({ showManage }: { showManage: boolean }) {
           <div>
             <p className="font-semibold">Telefonni dasturga bog&apos;lash</p>
             <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-              Android telefonga Companion ilovasini o&apos;rnating. USB yoki Wi‑Fi orqali
-              ulangan telefon orqali AI qo&apos;ng&apos;iroq qilishi, eshitishi va SMS
-              yuborishi mumkin.
+              Companion o&apos;rnatilgach USB yoki Wi‑Fi orqali serverga ulanadi. Keyin AI
+              qo&apos;ng&apos;iroq qilishi, eshitishi va SMS yuborishi mumkin.
             </p>
-            <ol className="mt-3 list-decimal space-y-1 pl-4 text-sm text-[var(--color-text-muted)]">
-              <li>Companion APK ni o&apos;rnating</li>
-              <li>Tenant token bilan ro&apos;yxatdan o&apos;ting</li>
-              <li>Qurilma &quot;onlayn&quot; holatda ko&apos;rinsin</li>
-              <li>Call markaz / SMS shu qurilma orqali ishlaydi</li>
-            </ol>
             {user?.sipExtension ? (
               <p className="mt-3 text-sm">
                 Brauzer softfoni:{' '}
