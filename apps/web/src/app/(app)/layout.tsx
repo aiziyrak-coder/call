@@ -61,12 +61,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setPhoneOpen(false);
   }, [pathname]);
 
-  if (loading || !user) {
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Spinner className="size-7 text-[var(--color-brand)]" />
       </div>
     );
+  }
+
+  if (!user) {
+    return null;
   }
 
   const logout = async () => {

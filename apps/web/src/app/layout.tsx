@@ -12,6 +12,7 @@ const outfit = Outfit({
 export const metadata: Metadata = {
   title: 'AiCC — AI Call Center',
   description: "Sun'iy intellektga asoslangan call-markaz platformasi",
+  icons: { icon: '/favicon.svg' },
 };
 
 export const viewport: Viewport = {

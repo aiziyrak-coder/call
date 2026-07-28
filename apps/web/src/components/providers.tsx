@@ -13,6 +13,7 @@ function AuthBootstrap({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    let settled = false;
     // Eski localStorage tokenlari — XSS xavfini bartaraf etish.
     try {
       window.localStorage.removeItem('aicc.accessToken');
@@ -21,11 +22,18 @@ function AuthBootstrap({ children }: { children: ReactNode }) {
       /* ignore */
     }
 
+    const finish = (user: CurrentUser | null) => {
+      settled = true;
+      if (!cancelled) {
+        if (!user) tokenStore.clear();
+        setUser(user);
+      }
+    };
+
     const boot = async () => {
       try {
-        // Access cookie yoki xotiradagi token orqali.
         const profile = await api.get<CurrentUser>('/users/me');
-        if (!cancelled) setUser(profile);
+        finish(profile);
         return;
       } catch {
         // Access muddati o'tgan bo'lishi mumkin — refresh cookie uriniladi.
@@ -39,18 +47,21 @@ function AuthBootstrap({ children }: { children: ReactNode }) {
         );
         if (refreshed.accessToken) tokenStore.set(refreshed.accessToken);
         const profile = await api.get<CurrentUser>('/users/me');
-        if (!cancelled) setUser(profile);
+        finish(profile);
       } catch {
-        if (!cancelled) {
-          tokenStore.clear();
-          setUser(null);
-        }
+        finish(null);
       }
     };
 
-    void boot();
+    // Nginx/tarmoq uzilsa spinnerda qolib ketmaslik.
+    const watchdog = window.setTimeout(() => {
+      if (!cancelled && !settled) finish(null);
+    }, 12_000);
+
+    void boot().finally(() => window.clearTimeout(watchdog));
     return () => {
       cancelled = true;
+      window.clearTimeout(watchdog);
     };
   }, [setUser]);
 
