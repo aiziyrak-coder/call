@@ -239,6 +239,31 @@ export class DevicesService {
     }));
   }
 
+  /** Companion o'rnatish uchun saytda ko'rsatiladigan qiymatlar. */
+  async setupGuide(user: AuthUser) {
+    const tenant = await this.prisma.tenant.findUniqueOrThrow({
+      where: { id: user.tenantId },
+      select: { slug: true, name: true },
+    });
+    const publicUrl = this.config.get<string>('PUBLIC_API_URL', 'https://call.devflix.uz').replace(/\/$/, '');
+    const enrollmentSecret = this.config.getOrThrow<string>('DEVICE_ENROLLMENT_SECRET');
+
+    return {
+      serverUrl: publicUrl,
+      tenantSlug: tenant.slug,
+      tenantName: tenant.name,
+      enrollmentSecret,
+      steps: [
+        "Companion APK ni QR yoki havola orqali yuklab o'rnating",
+        `Server manzili: ${publicUrl}`,
+        `Tashkilot kodi (tenant): ${tenant.slug}`,
+        "Ro'yxatdan o'tish sirini nusxa ko'chirib ilovaga joylang",
+        "Ruxsatlar va batareya cheklovini olib tashlang",
+        "Ro'yxatdan o'tish tugmasini bosing",
+      ],
+    };
+  }
+
   async update(user: AuthUser, id: string, input: DeviceWrite) {
     const existing = await this.prisma.device.findFirst({
       where: { id, tenantId: user.tenantId },

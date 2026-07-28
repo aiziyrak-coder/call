@@ -14,6 +14,10 @@ class Settings(context: Context) {
         get() = prefs.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL
         set(value) = prefs.edit { putString(KEY_BASE_URL, value.trim()) }
 
+    var tenantSlug: String
+        get() = prefs.getString(KEY_TENANT_SLUG, DEFAULT_TENANT_SLUG) ?: DEFAULT_TENANT_SLUG
+        set(value) = prefs.edit { putString(KEY_TENANT_SLUG, value.trim()) }
+
     var deviceToken: String?
         get() = prefs.getString(KEY_TOKEN, null)
         set(value) = prefs.edit { putString(KEY_TOKEN, value) }
@@ -44,13 +48,15 @@ class Settings(context: Context) {
 
     private companion object {
         const val KEY_BASE_URL = "baseUrl"
+        const val KEY_TENANT_SLUG = "tenantSlug"
         const val KEY_TOKEN = "deviceToken"
         const val KEY_DEVICE_ID = "deviceId"
         const val KEY_NAME = "deviceName"
         const val KEY_OPERATOR = "operatorEmail"
         const val KEY_LAST_INBOX = "lastInboxTs"
 
-        // Emulyatorda host mashinaga shu manzil orqali chiqiladi.
-        const val DEFAULT_BASE_URL = "http://10.0.2.2:4000"
+        // Prod default — emulyator emas, haqiqiy telefon uchun.
+        const val DEFAULT_BASE_URL = "https://call.devflix.uz"
+        const val DEFAULT_TENANT_SLUG = "demo"
     }
 }

@@ -111,6 +111,12 @@ export class DevicesController {
 
   // ------------------------------------------------------------------ admin
 
+  @Get('setup-guide')
+  @ApiOperation({ summary: "Companion o'rnatish yo'riqnomasi (server, sir, slug)" })
+  setupGuide(@CurrentUser() user: AuthUser) {
+    return this.devices.setupGuide(user);
+  }
+
   @Get()
   @RequirePermissions('device:read')
   @ApiOperation({ summary: "Qurilmalar ro'yxati va holati" })

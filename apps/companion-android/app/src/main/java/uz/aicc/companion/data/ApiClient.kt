@@ -13,6 +13,7 @@ import java.util.concurrent.TimeUnit
 @Serializable
 data class EnrollRequest(
     val enrollmentSecret: String,
+    val tenantSlug: String,
     val hardwareId: String,
     val name: String,
     val phoneNumbers: List<String> = emptyList(),

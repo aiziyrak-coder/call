@@ -2,8 +2,9 @@
 <resources>
     <string name="app_name">AiCC Companion</string>
     <string name="status_unknown">Holat: aniqlanmagan</string>
-    <string name="hint_server">Server manzili (http://192.168.1.10:4000)</string>
+    <string name="hint_server">Server manzili (https://call.devflix.uz)</string>
     <string name="hint_device_name">Qurilma nomi</string>
+    <string name="hint_tenant">Tashkilot kodi (tenant)</string>
     <string name="hint_operator">Operator email (ixtiyoriy)</string>
     <string name="hint_secret">Ro\'yxatdan o\'tish siri</string>
     <string name="action_enroll">Ro\'yxatdan o\'tish</string>

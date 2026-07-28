@@ -22,7 +22,7 @@ import { UsersTab } from '@/components/admin/users-tab';
 import { QueuesTab } from '@/components/admin/queues-tab';
 import { DevicesTab } from '@/components/admin/devices-tab';
 import { AuditTab } from '@/components/admin/audit-tab';
-import { CompanionDownloadCard } from '@/components/settings/companion-download-card';
+import { CompanionSetupGuide } from '@/components/settings/companion-setup-guide';
 
 type TabKey = 'business' | 'users' | 'phone' | 'queues' | 'audit' | 'profile';
 
@@ -184,7 +184,7 @@ function PhoneTab({ showManage }: { showManage: boolean }) {
 
   return (
     <div className="space-y-4">
-      <CompanionDownloadCard />
+      <CompanionSetupGuide />
 
       <Card className="p-5">
         <div className="flex gap-3">
@@ -192,18 +192,14 @@ function PhoneTab({ showManage }: { showManage: boolean }) {
             <Smartphone className="size-5" />
           </div>
           <div>
-            <p className="font-semibold">Telefonni dasturga bog&apos;lash</p>
-            <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-              Companion o&apos;rnatilgach USB yoki Wi‑Fi orqali serverga ulanadi. Keyin AI
-              qo&apos;ng&apos;iroq qilishi, eshitishi va SMS yuborishi mumkin.
-            </p>
+            <p className="font-semibold">Brauzer softfoni</p>
             {user?.sipExtension ? (
-              <p className="mt-3 text-sm">
-                Brauzer softfoni:{' '}
+              <p className="mt-1 text-sm">
+                SIP raqamingiz:{' '}
                 <span className="font-mono font-semibold">{user.sipExtension}</span>
               </p>
             ) : (
-              <p className="mt-3 text-sm text-[var(--color-warning)]">
+              <p className="mt-1 text-sm text-[var(--color-warning)]">
                 SIP raqami berilmagan — softfon uchun administratordan so&apos;rang
               </p>
             )}

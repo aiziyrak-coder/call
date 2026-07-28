@@ -42,6 +42,7 @@ class MainActivity : AppCompatActivity() {
         settings = Settings(this)
         binding.serverUrl.setText(settings.baseUrl)
         binding.deviceName.setText(settings.deviceName)
+        binding.tenantSlug.setText(settings.tenantSlug)
         binding.operatorEmail.setText(settings.operatorEmail.orEmpty())
 
         binding.enrollButton.setOnClickListener { enroll() }
@@ -55,16 +56,18 @@ class MainActivity : AppCompatActivity() {
     private fun enroll() {
         val baseUrl = binding.serverUrl.text.toString().trim()
         val name = binding.deviceName.text.toString().trim()
+        val tenantSlug = binding.tenantSlug.text.toString().trim()
         val secret = binding.enrollmentSecret.text.toString().trim()
         val operator = binding.operatorEmail.text.toString().trim()
 
-        if (baseUrl.isEmpty() || name.isEmpty() || secret.isEmpty()) {
-            toast("Server, nom va sir to'ldirilishi kerak")
+        if (baseUrl.isEmpty() || name.isEmpty() || secret.isEmpty() || tenantSlug.isEmpty()) {
+            toast("Server, nom, tashkilot kodi va sir to'ldirilishi kerak")
             return
         }
 
         settings.baseUrl = baseUrl
         settings.deviceName = name
+        settings.tenantSlug = tenantSlug
         settings.operatorEmail = operator.ifBlank { null }
 
         binding.enrollButton.isEnabled = false
@@ -75,6 +78,7 @@ class MainActivity : AppCompatActivity() {
                     ApiClient(settings).enroll(
                         EnrollRequest(
                             enrollmentSecret = secret,
+                            tenantSlug = tenantSlug,
                             hardwareId = hardwareId(),
                             name = name,
                             simSlots = 1,
