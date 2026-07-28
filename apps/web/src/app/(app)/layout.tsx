@@ -53,7 +53,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [phoneOpen, setPhoneOpen] = useState(false);
 
   useEffect(() => {
-    if (!loading && !user) router.replace('/login');
+    if (loading || user) return;
+    if (typeof window !== 'undefined') {
+      window.location.replace('/login');
+    } else {
+      router.replace('/login');
+    }
   }, [loading, user, router]);
 
   useEffect(() => {
@@ -61,16 +66,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setPhoneOpen(false);
   }, [pathname]);
 
-  if (loading) {
+  if (loading || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Spinner className="size-7 text-[var(--color-brand)]" />
       </div>
     );
-  }
-
-  if (!user) {
-    return null;
   }
 
   const logout = async () => {

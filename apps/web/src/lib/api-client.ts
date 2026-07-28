@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '';
 const API_PREFIX = '/api/v1';
 
 /**
@@ -34,72 +34,41 @@ export const tokenStore = {
 };
 
 let refreshInFlight: Promise<boolean> | null = null;
-const REFRESH_LOCK_CHANNEL =
-  typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('aicc-auth-refresh') : null;
+
+function apiOrigin(): string {
+  if (API_BASE) return API_BASE.replace(/\/$/, '');
+  if (typeof window !== 'undefined') return window.location.origin;
+  return 'http://localhost:4000';
+}
 
 /** Bir tab refresh qilayotganda boshqalari kutadi — refresh token oilasini buzmaslik. */
 export async function refreshTokens(): Promise<boolean> {
   if (refreshInFlight) return refreshInFlight;
 
   refreshInFlight = (async () => {
-    REFRESH_LOCK_CHANNEL?.postMessage({ type: 'refresh-start' });
     try {
-      const response = await fetch(`${API_BASE}${API_PREFIX}/auth/refresh`, {
+      const response = await fetch(`${apiOrigin()}${API_PREFIX}/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({}),
+        signal: AbortSignal.timeout(8_000),
       });
       if (!response.ok) {
         tokenStore.clear();
-        REFRESH_LOCK_CHANNEL?.postMessage({ type: 'refresh-fail' });
         return false;
       }
       const data = (await response.json()) as { accessToken?: string; expiresIn?: number };
       if (data.accessToken) tokenStore.set(data.accessToken);
-      REFRESH_LOCK_CHANNEL?.postMessage({ type: 'refresh-ok' });
       return true;
     } catch {
-      REFRESH_LOCK_CHANNEL?.postMessage({ type: 'refresh-fail' });
       return false;
     } finally {
-      setTimeout(() => {
-        refreshInFlight = null;
-      }, 0);
+      refreshInFlight = null;
     }
   })();
 
   return refreshInFlight;
-}
-
-if (REFRESH_LOCK_CHANNEL) {
-  REFRESH_LOCK_CHANNEL.addEventListener('message', (event: MessageEvent) => {
-    const data = event.data as { type?: string } | undefined;
-    if (data?.type === 'refresh-start' && !refreshInFlight) {
-      // Boshqa tab refresh qilmoqda — shu tab ham shu promise ni kutishi uchun
-      // qisqa "kutish" flagni qo'yamiz (haqiqiy so'rov yubormaymiz).
-      refreshInFlight = new Promise((resolve) => {
-        const onDone = (next: MessageEvent) => {
-          const payload = next.data as { type?: string } | undefined;
-          if (payload?.type === 'refresh-ok') {
-            REFRESH_LOCK_CHANNEL?.removeEventListener('message', onDone);
-            refreshInFlight = null;
-            resolve(true);
-          } else if (payload?.type === 'refresh-fail') {
-            REFRESH_LOCK_CHANNEL?.removeEventListener('message', onDone);
-            refreshInFlight = null;
-            resolve(false);
-          }
-        };
-        REFRESH_LOCK_CHANNEL?.addEventListener('message', onDone);
-        setTimeout(() => {
-          REFRESH_LOCK_CHANNEL?.removeEventListener('message', onDone);
-          refreshInFlight = null;
-          resolve(false);
-        }, 8_000);
-      });
-    }
-  });
 }
 
 export interface RequestOptions {
@@ -112,7 +81,7 @@ export interface RequestOptions {
 }
 
 function buildUrl(path: string, query?: RequestOptions['query']): URL {
-  const url = new URL(`${API_BASE}${API_PREFIX}${path}`);
+  const url = new URL(`${apiOrigin()}${API_PREFIX}${path}`);
   for (const [key, value] of Object.entries(query ?? {})) {
     if (value === undefined || value === null || value === '') continue;
     url.searchParams.set(key, String(value));
@@ -132,8 +101,6 @@ async function withAuthRetry(send: () => Promise<Response>, anonymous?: boolean)
     const refreshed = await refreshTokens();
     if (refreshed) {
       response = await send();
-    } else if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
-      window.location.href = '/login';
     }
   }
   return response;
@@ -152,7 +119,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
           ...authHeaders(options.anonymous),
         },
         body: options.body ? JSON.stringify(options.body) : undefined,
-        signal: options.signal,
+        signal: options.signal ?? AbortSignal.timeout(20_000),
       }),
     options.anonymous,
   );
@@ -183,7 +150,7 @@ export async function fetchBlob(path: string, options: Omit<RequestOptions, 'bod
         method: options.method ?? 'GET',
         credentials: 'include',
         headers: authHeaders(options.anonymous),
-        signal: options.signal,
+        signal: options.signal ?? AbortSignal.timeout(60_000),
       }),
     options.anonymous,
   );

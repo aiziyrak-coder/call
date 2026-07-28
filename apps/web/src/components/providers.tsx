@@ -4,64 +4,81 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
 import { Toaster } from 'sonner';
-import { api, tokenStore } from '@/lib/api-client';
+import { tokenStore } from '@/lib/api-client';
 import { useAuthStore } from '@/lib/stores';
 import type { CurrentUser } from '@/lib/types';
 
+function goLogin() {
+  if (typeof window === 'undefined') return;
+  if (window.location.pathname.startsWith('/login')) return;
+  window.location.replace('/login');
+}
+
+/** StrictMode ikki marta mount qilsa ham bitta boot. */
+let bootPromise: Promise<CurrentUser | null> | null = null;
+
+async function resolveSession(): Promise<CurrentUser | null> {
+  if (bootPromise) return bootPromise;
+
+  bootPromise = (async () => {
+    const origin = window.location.origin;
+    const ctrl = new AbortController();
+    const timer = window.setTimeout(() => ctrl.abort(), 8_000);
+
+    try {
+      let me = await fetch(`${origin}/api/v1/users/me`, {
+        credentials: 'include',
+        signal: ctrl.signal,
+      });
+
+      if (me.status === 401) {
+        const refreshed = await fetch(`${origin}/api/v1/auth/refresh`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: '{}',
+          signal: ctrl.signal,
+        });
+        if (refreshed.ok) {
+          me = await fetch(`${origin}/api/v1/users/me`, {
+            credentials: 'include',
+            signal: ctrl.signal,
+          });
+        }
+      }
+
+      if (!me.ok) return null;
+      return (await me.json()) as CurrentUser;
+    } catch {
+      return null;
+    } finally {
+      window.clearTimeout(timer);
+    }
+  })();
+
+  return bootPromise;
+}
+
+/**
+ * Sessiyani mustaqil fetch bilan tekshiradi (api-client retry loopsiz).
+ * Sessiyasiz → darhol /login.
+ */
 function AuthBootstrap({ children }: { children: ReactNode }) {
   const setUser = useAuthStore((state) => state.setUser);
 
   useEffect(() => {
-    let cancelled = false;
-    let settled = false;
-    // Eski localStorage tokenlari — XSS xavfini bartaraf etish.
-    try {
-      window.localStorage.removeItem('aicc.accessToken');
-      window.localStorage.removeItem('aicc.refreshToken');
-    } catch {
-      /* ignore */
-    }
+    let alive = true;
 
-    const finish = (user: CurrentUser | null) => {
-      settled = true;
-      if (!cancelled) {
-        if (!user) tokenStore.clear();
-        setUser(user);
-      }
-    };
+    void (async () => {
+      const profile = await resolveSession();
+      if (!alive) return;
+      if (!profile) tokenStore.clear();
+      setUser(profile);
+      if (!profile) goLogin();
+    })();
 
-    const boot = async () => {
-      try {
-        const profile = await api.get<CurrentUser>('/users/me');
-        finish(profile);
-        return;
-      } catch {
-        // Access muddati o'tgan bo'lishi mumkin — refresh cookie uriniladi.
-      }
-
-      try {
-        const refreshed = await api.post<{ accessToken?: string; expiresIn?: number }>(
-          '/auth/refresh',
-          {},
-          { anonymous: true },
-        );
-        if (refreshed.accessToken) tokenStore.set(refreshed.accessToken);
-        const profile = await api.get<CurrentUser>('/users/me');
-        finish(profile);
-      } catch {
-        finish(null);
-      }
-    };
-
-    // Nginx/tarmoq uzilsa spinnerda qolib ketmaslik.
-    const watchdog = window.setTimeout(() => {
-      if (!cancelled && !settled) finish(null);
-    }, 12_000);
-
-    void boot().finally(() => window.clearTimeout(watchdog));
     return () => {
-      cancelled = true;
-      window.clearTimeout(watchdog);
+      alive = false;
     };
   }, [setUser]);
 
