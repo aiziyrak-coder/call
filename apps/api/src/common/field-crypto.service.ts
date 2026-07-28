@@ -13,8 +13,13 @@ export class FieldCryptoService {
   private readonly key: Buffer;
 
   constructor(config: ConfigService) {
-    const hex = config.getOrThrow<string>('RECORDING_ENCRYPTION_KEY');
+    const hex =
+      config.get<string>('FIELD_ENCRYPTION_KEY') ??
+      config.getOrThrow<string>('RECORDING_ENCRYPTION_KEY');
     this.key = Buffer.from(hex, 'hex');
+    if (this.key.length !== 32) {
+      throw new Error('FIELD_ENCRYPTION_KEY / RECORDING_ENCRYPTION_KEY 32 bayt (64 hex) bo\'lishi kerak');
+    }
   }
 
   encrypt(plaintext: string): string {

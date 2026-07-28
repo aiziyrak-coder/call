@@ -27,7 +27,7 @@ export interface SoftphoneCredentials {
 export interface LoginResponse {
   status: 'authenticated' | 'mfa_required';
   mfaToken?: string;
-  tokens?: { accessToken: string; refreshToken: string; expiresIn: number };
+  tokens?: { accessToken: string; expiresIn: number; refreshToken?: string };
   user?: { id: string; email: string; fullName: string; roles: Role[]; tenantId: string };
 }
 

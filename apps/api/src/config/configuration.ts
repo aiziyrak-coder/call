@@ -43,7 +43,7 @@ export const envSchema = z.object({
   GSM_GATEWAY_USER: z.string().optional(),
   GSM_GATEWAY_PASSWORD: z.string().optional(),
 
-  DEVICE_ENROLLMENT_SECRET: z.string().min(8),
+  DEVICE_ENROLLMENT_SECRET: z.string().min(24),
 
   CORS_ORIGINS: z.string().default('http://localhost:3000'),
 });

@@ -3,8 +3,8 @@ import { createZodDto } from '../common/zod';
 
 export const enrollSchema = z.object({
   /** `DEVICE_ENROLLMENT_SECRET` — admin panelidan olinadi. */
-  enrollmentSecret: z.string().min(8),
-  tenantSlug: z.string().min(1).optional(),
+  enrollmentSecret: z.string().min(24),
+  tenantSlug: z.string().min(1),
   hardwareId: z.string().min(4).max(128),
   name: z.string().min(1).max(120),
   phoneNumbers: z.array(z.string().min(3)).max(4).default([]),

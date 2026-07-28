@@ -11,7 +11,6 @@ coverage/
 .env.*.local
 !.env.example
 infra/.env.prod
-infra/.env.prod.template
 
 
 *.log
@@ -31,6 +30,7 @@ apps/companion-android/build/
 infra/asterisk/certs/*.pem
 infra/asterisk/certs/*.key
 infra/asterisk/certs/*.crt
+infra/asterisk/config/pjsip_endpoints.conf
 infra/data/
 
 __pycache__/

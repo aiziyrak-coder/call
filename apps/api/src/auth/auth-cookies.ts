@@ -37,3 +37,15 @@ export function clearAuthCookies(res: Response): void {
     path: '/api/v1/auth',
   });
 }
+
+/** Brauzerga refresh tokenni JSON da bermaymiz — faqat cookie. */
+export function publicTokenResponse(tokens: {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+}) {
+  return {
+    accessToken: tokens.accessToken,
+    expiresIn: tokens.expiresIn,
+  };
+}

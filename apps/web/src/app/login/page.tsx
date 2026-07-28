@@ -19,8 +19,8 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  const finish = async (tokens: { accessToken: string; refreshToken: string }) => {
-    tokenStore.set(tokens.accessToken, tokens.refreshToken);
+  const finish = async (tokens: { accessToken: string; expiresIn?: number }) => {
+    tokenStore.set(tokens.accessToken);
     const profile = await api.get<CurrentUser>('/users/me');
     setUser(profile);
     router.replace('/');

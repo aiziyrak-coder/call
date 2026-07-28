@@ -13,6 +13,13 @@ const ARGON2_OPTIONS = {
 } as const;
 
 async function main() {
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_SEED !== '1') {
+    console.error(
+      'Seed production da o\'chirilgan. Faqat bootstrap uchun ALLOW_SEED=1 bilan ishga tushiring.',
+    );
+    process.exit(1);
+  }
+
   console.log('Seed boshlandi...');
 
   const tenant = await prisma.tenant.upsert({
@@ -74,7 +81,10 @@ async function main() {
         roles: seed.roles,
         sipExtension: seed.sipExtension,
         // Softfon Asterisk ga shu parol bilan ro'yxatdan o'tadi.
-        sipPassword: seed.sipExtension ? `sip_${seed.sipExtension}_dev` : null,
+        // Softfon uchun tasodifiy SIP parol (dev); provision shifrlaydi.
+        sipPassword: seed.sipExtension
+          ? `sip_${seed.sipExtension}_${Math.random().toString(36).slice(2, 10)}`
+          : null,
       },
     });
   }

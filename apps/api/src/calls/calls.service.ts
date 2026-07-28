@@ -263,12 +263,20 @@ export class CallsService {
     if (!hasPermission(user.roles, permission)) {
       throw new ForbiddenException("Bu amalga ruxsat yo'q");
     }
-    if (resolveScope(user.roles, 'call', 'read') === 'all') return;
+
+    const scope = resolveScope(user.roles, 'call', 'read');
+    if (scope === 'none') {
+      throw new ForbiddenException("Bu amalga ruxsat yo'q");
+    }
 
     const active = await this.telephony.activeCalls().catch(() => []);
     const live = active.find((call) => call.callId === callId);
     if (live) {
-      if (live.tenantId !== user.tenantId || live.operatorId !== user.id) {
+      // Har doim tenant — `:all` faqat shu tashkilot ichida.
+      if (live.tenantId !== user.tenantId) {
+        throw new ForbiddenException("Bu qo'ng'iroq sizga tegishli emas");
+      }
+      if (scope === 'own' && live.operatorId !== user.id) {
         throw new ForbiddenException("Bu qo'ng'iroq sizga tegishli emas");
       }
       return;
@@ -279,10 +287,9 @@ export class CallsService {
       select: { operatorId: true },
     });
     if (!call) throw new NotFoundException("Qo'ng'iroq topilmadi");
-    if (call.operatorId !== user.id) {
+    if (scope === 'own' && call.operatorId !== user.id) {
       throw new ForbiddenException("Bu qo'ng'iroq sizga tegishli emas");
     }
   }
 }
-
 export type { Role };

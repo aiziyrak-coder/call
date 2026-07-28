@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -20,6 +20,7 @@ import { AuditInterceptor } from './common/audit.interceptor';
 import { AllExceptionsFilter } from './common/exception.filter';
 import { HealthModule } from './health/health.module';
 import { CryptoModule } from './common/crypto.module';
+import { CsrfOriginMiddleware } from './common/csrf-origin.middleware';
 
 @Module({
   imports: [
@@ -52,4 +53,8 @@ import { CryptoModule } from './common/crypto.module';
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(CsrfOriginMiddleware).forRoutes('*');
+  }
+}

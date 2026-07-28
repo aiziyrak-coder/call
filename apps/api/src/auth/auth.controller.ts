@@ -11,7 +11,13 @@ import {
   RefreshDto,
   VerifyMfaDto,
 } from './auth.dto';
-import { ACCESS_COOKIE, REFRESH_COOKIE, clearAuthCookies, setAuthCookies } from './auth-cookies';
+import {
+  ACCESS_COOKIE,
+  REFRESH_COOKIE,
+  clearAuthCookies,
+  publicTokenResponse,
+  setAuthCookies,
+} from './auth-cookies';
 import { Audit, CurrentUser, Public } from './decorators';
 import type { AuthUser } from './auth.types';
 
@@ -28,7 +34,10 @@ export class AuthController {
   @ApiOperation({ summary: 'Email va parol bilan kirish' })
   async login(@Body() dto: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const result = await this.auth.login(dto.email, dto.password, requestContext(req));
-    if (result.tokens) setAuthCookies(res, result.tokens);
+    if (result.tokens) {
+      setAuthCookies(res, result.tokens);
+      return { ...result, tokens: publicTokenResponse(result.tokens) };
+    }
     return result;
   }
 
@@ -44,7 +53,10 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.auth.verifyMfa(dto.mfaToken, dto.code, requestContext(req));
-    if (result.tokens) setAuthCookies(res, result.tokens);
+    if (result.tokens) {
+      setAuthCookies(res, result.tokens);
+      return { ...result, tokens: publicTokenResponse(result.tokens) };
+    }
     return result;
   }
 
@@ -58,11 +70,12 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const refreshToken =
-      dto.refreshToken || (req.cookies?.[REFRESH_COOKIE] as string | undefined) || '';
+    // Production da refresh faqat httpOnly cookie orqali.
+    const fromBody = process.env.NODE_ENV === 'production' ? '' : (dto.refreshToken ?? '');
+    const refreshToken = fromBody || (req.cookies?.[REFRESH_COOKIE] as string | undefined) || '';
     const tokens = await this.auth.refresh(refreshToken, requestContext(req));
     setAuthCookies(res, tokens);
-    return tokens;
+    return publicTokenResponse(tokens);
   }
 
   @Public()
@@ -75,8 +88,8 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<void> {
-    const refreshToken =
-      dto.refreshToken || (req.cookies?.[REFRESH_COOKIE] as string | undefined) || '';
+    const fromBody = process.env.NODE_ENV === 'production' ? '' : (dto.refreshToken ?? '');
+    const refreshToken = fromBody || (req.cookies?.[REFRESH_COOKIE] as string | undefined) || '';
     if (refreshToken) await this.auth.logout(refreshToken);
     clearAuthCookies(res);
   }

@@ -45,16 +45,20 @@ export class DevicesService {
 
   async enroll(input: EnrollInput): Promise<{ deviceId: string; deviceToken: string }> {
     const secret = this.config.getOrThrow<string>('DEVICE_ENROLLMENT_SECRET');
+    if (secret.length < 24) {
+      throw new UnauthorizedException("Ro'yxatdan o'tish siri zaif sozlangan");
+    }
     if (!safeEqual(input.enrollmentSecret, secret)) {
       throw new UnauthorizedException("Ro'yxatdan o'tish siri noto'g'ri");
     }
 
-    const tenant = input.tenantSlug
-      ? await this.prisma.tenant.findFirst({ where: { slug: input.tenantSlug, isActive: true } })
-      : await this.prisma.tenant.findFirst({
-          where: { isActive: true },
-          orderBy: { createdAt: 'asc' },
-        });
+    if (!input.tenantSlug) {
+      throw new BadRequestException('tenantSlug majburiy');
+    }
+
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { slug: input.tenantSlug, isActive: true },
+    });
     if (!tenant) throw new BadRequestException('Tashkilot topilmadi');
 
     const operator = input.operatorEmail
@@ -64,23 +68,25 @@ export class DevicesService {
         })
       : null;
 
+    const existing = await this.prisma.device.findUnique({
+      where: { tenantId_hardwareId: { tenantId: tenant.id, hardwareId: input.hardwareId } },
+      select: { id: true },
+    });
+
     const deviceToken = randomBytes(32).toString('hex');
     const phoneNumbers = input.phoneNumbers
       .map((phone) => normalizePhone(phone))
       .filter((phone): phone is string => Boolean(phone));
 
-    const device = await this.prisma.device.upsert({
-      where: { tenantId_hardwareId: { tenantId: tenant.id, hardwareId: input.hardwareId } },
-      update: {
-        name: input.name,
-        phoneNumbers,
-        simSlots: input.simSlots,
-        appVersion: input.appVersion,
-        authTokenHash: hashToken(deviceToken),
-        isActive: true,
-        operatorId: operator?.id ?? undefined,
-      },
-      create: {
+    if (existing) {
+      // Token rotatsiyasi — faqat admin o'chirib qayta ulaganda. Takeover oldini olish.
+      throw new BadRequestException(
+        "Bu qurilma allaqachon ro'yxatdan o'tgan. Qayta ulash uchun admin panelidan o'chiring",
+      );
+    }
+
+    const device = await this.prisma.device.create({
+      data: {
         tenantId: tenant.id,
         kind: 'ANDROID_COMPANION',
         name: input.name,
@@ -143,29 +149,30 @@ export class DevicesService {
 
   /** Qurilma jo'natishi kerak bo'lgan navbatdagi SMS lar. */
   async outbox(device: DeviceContext) {
-    const messages = await this.prisma.smsMessage.findMany({
-      where: {
-        tenantId: device.tenantId,
-        direction: 'OUTBOUND',
-        status: 'QUEUED',
-        // Qurilmaga biriktirilgan yoki hali hech kimga tegishli bo'lmagan xabarlar.
-        OR: [{ deviceId: device.id }, { deviceId: null, provider: 'android' }],
-      },
-      orderBy: { createdAt: 'asc' },
-      take: OUTBOX_BATCH,
-      select: { id: true, toNumber: true, text: true, simSlot: true },
-    });
-
-    if (messages.length === 0) return { messages: [] };
-
-    // Ikkita qurilma bir xabarni ikki marta yubormasligi uchun darhol band qilamiz.
-    await this.prisma.smsMessage.updateMany({
-      where: { id: { in: messages.map((message) => message.id) } },
-      data: { deviceId: device.id, status: 'SENDING', provider: 'android' },
-    });
+    // Atomik claim: faqat hali QUEUED bo'lganlarni SENDING ga o'tkazamiz.
+    const claimed = await this.prisma.$queryRaw<
+      Array<{ id: string; toNumber: string; text: string; simSlot: number | null }>
+    >`
+      UPDATE "sms_messages"
+      SET "deviceId" = ${device.id},
+          "status" = 'SENDING'::"SmsStatus",
+          "provider" = 'android',
+          "updatedAt" = NOW()
+      WHERE "id" IN (
+        SELECT "id" FROM "sms_messages"
+        WHERE "tenantId" = ${device.tenantId}
+          AND "direction" = 'OUTBOUND'::"SmsDirection"
+          AND "status" = 'QUEUED'::"SmsStatus"
+          AND ("deviceId" = ${device.id} OR ("deviceId" IS NULL AND "provider" = 'android'))
+        ORDER BY "createdAt" ASC
+        LIMIT ${OUTBOX_BATCH}
+        FOR UPDATE SKIP LOCKED
+      )
+      RETURNING "id", "toNumber", "text", "simSlot"
+    `;
 
     return {
-      messages: messages.map((message) => ({
+      messages: claimed.map((message) => ({
         id: message.id,
         to: message.toNumber,
         text: message.text,
@@ -238,6 +245,14 @@ export class DevicesService {
       select: { id: true },
     });
     if (!existing) throw new NotFoundException('Qurilma topilmadi');
+
+    if (input.operatorId) {
+      const operator = await this.prisma.user.findFirst({
+        where: { id: input.operatorId, tenantId: user.tenantId, isActive: true },
+        select: { id: true },
+      });
+      if (!operator) throw new BadRequestException('Operator topilmadi');
+    }
 
     return this.prisma.device.update({
       where: { id },

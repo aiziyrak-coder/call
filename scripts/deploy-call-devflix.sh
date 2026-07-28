@@ -8,13 +8,22 @@ COMPOSE=(docker compose -p aicc-call -f infra/docker-compose.prod.yml --env-file
 NGINX_AVAIL=/etc/nginx/sites-available/call.devflix.uz
 NGINX_ENABLED=/etc/nginx/sites-enabled/call.devflix.uz
 
-echo "==> Build + up"
-"${COMPOSE[@]}" build
-"${COMPOSE[@]}" up -d
+if [[ ! -f infra/.env.prod ]]; then
+  echo "infra/.env.prod topilmadi" >&2
+  exit 1
+fi
+chmod 600 infra/.env.prod || true
 
-echo "==> Migratsiya / seed"
+echo "==> Build + up (healthy kutish)"
+"${COMPOSE[@]}" build
+"${COMPOSE[@]}" up -d --wait --wait-timeout 180
+
+echo "==> Migratsiya (seed prod da o'chirilgan)"
 "${COMPOSE[@]}" exec -T api sh -c 'pnpm exec prisma migrate deploy'
-"${COMPOSE[@]}" exec -T api sh -c 'pnpm exec tsx prisma/seed.ts' || echo "seed ogohlantirish (davom)"
+if [[ "${ALLOW_SEED:-0}" == "1" ]]; then
+  echo "==> Seed (ALLOW_SEED=1)"
+  "${COMPOSE[@]}" exec -T api sh -c 'pnpm exec tsx prisma/seed.ts'
+fi
 
 echo "==> Nginx faqat call.devflix.uz"
 sudo mkdir -p /var/www/certbot
@@ -24,7 +33,6 @@ if [[ ! -d /etc/letsencrypt/live/call.devflix.uz ]]; then
   sudo ln -sfn "$NGINX_AVAIL" "$NGINX_ENABLED"
   sudo nginx -t
   sudo systemctl reload nginx
-  # Certbot faqat shu domen uchun; boshqa conf larni o'zgartirmaydi (--cert-name).
   sudo certbot certonly --webroot -w /var/www/certbot \
     -d call.devflix.uz \
     --cert-name call.devflix.uz \
@@ -36,10 +44,12 @@ sudo ln -sfn "$NGINX_AVAIL" "$NGINX_ENABLED"
 sudo nginx -t
 sudo systemctl reload nginx
 
-echo "==> Tekshiruv"
+echo "==> Tekshiruv (muvaffaqiyatsizlik = deploy fail)"
 "${COMPOSE[@]}" ps
-sleep 3
-curl -fsS -o /dev/null -w "health %{http_code}\n" http://127.0.0.1:14100/api/v1/health || true
-curl -fsS -o /dev/null -w "web   %{http_code}\n" http://127.0.0.1:13100/ || true
-curl -fsS -o /dev/null -w "https %{http_code}\n" https://call.devflix.uz/api/v1/health || true
+sleep 2
+code="$(curl -fsS -o /tmp/aicc-health.json -w '%{http_code}' http://127.0.0.1:14100/api/v1/health)"
+[[ "$code" == "200" ]] || { echo "API health HTTP $code"; cat /tmp/aicc-health.json; exit 1; }
+grep -q '"status":"ok"' /tmp/aicc-health.json || { echo "API degraded"; cat /tmp/aicc-health.json; exit 1; }
+curl -fsS -o /dev/null -w "web   %{http_code}\n" http://127.0.0.1:13100/
+curl -fsS -o /dev/null -w "https %{http_code}\n" https://call.devflix.uz/api/v1/health
 echo "OK https://call.devflix.uz"

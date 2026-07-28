@@ -48,8 +48,8 @@ async function refreshTokens(): Promise<boolean> {
         tokenStore.clear();
         return false;
       }
-      const data = (await response.json()) as { accessToken: string; refreshToken: string };
-      tokenStore.set(data.accessToken, data.refreshToken);
+      const data = (await response.json()) as { accessToken: string; expiresIn?: number };
+      tokenStore.set(data.accessToken);
       return true;
     } catch {
       return false;

@@ -173,34 +173,33 @@ export class AuthService {
     }
 
     const tokenHash = AuthService.hashToken(refreshToken);
-    const stored = await this.prisma.refreshToken.findUnique({ where: { tokenHash } });
 
-    if (!stored) throw new UnauthorizedException('Refresh token topilmadi');
+    // Atomik: faqat hali bekor qilinmagan tokenni claim qilamiz (race-safe).
+    const claimed = await this.prisma.refreshToken.updateMany({
+      where: { tokenHash, revokedAt: null, expiresAt: { gt: new Date() } },
+      data: { revokedAt: new Date() },
+    });
 
-    if (stored.revokedAt) {
-      this.logger.warn(
-        `Bekor qilingan refresh token qayta ishlatildi (user=${payload.sub}). Oila bekor qilinmoqda.`,
-      );
-      await this.prisma.refreshToken.updateMany({
-        where: { familyId: stored.familyId, revokedAt: null },
-        data: { revokedAt: new Date() },
-      });
-      throw new UnauthorizedException('Refresh token bekor qilingan');
+    if (claimed.count === 0) {
+      const stored = await this.prisma.refreshToken.findUnique({ where: { tokenHash } });
+      if (stored?.revokedAt) {
+        this.logger.warn(
+          `Bekor qilingan refresh token qayta ishlatildi (user=${payload.sub}). Oila bekor qilinmoqda.`,
+        );
+        await this.prisma.refreshToken.updateMany({
+          where: { familyId: stored.familyId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+        throw new UnauthorizedException('Refresh token bekor qilingan');
+      }
+      throw new UnauthorizedException('Refresh token yaroqsiz yoki muddati o\'tgan');
     }
 
-    if (stored.expiresAt < new Date()) {
-      throw new UnauthorizedException("Refresh token muddati o'tgan");
-    }
-
+    const stored = await this.prisma.refreshToken.findUniqueOrThrow({ where: { tokenHash } });
     const user = await this.prisma.user.findFirst({
       where: { id: payload.sub, tenantId: payload.tid, isActive: true },
     });
     if (!user) throw new UnauthorizedException('Foydalanuvchi faol emas');
-
-    await this.prisma.refreshToken.update({
-      where: { id: stored.id },
-      data: { revokedAt: new Date() },
-    });
 
     return this.issueTokens(
       user.id,

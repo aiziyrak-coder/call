@@ -2,6 +2,12 @@
 # Portlar 127.0.0.1 ga bog'langan (izolatsiya).
 name: aicc-call
 
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: '50m'
+    max-file: '5'
+
 services:
   postgres:
     image: postgres:17-alpine
@@ -14,11 +20,16 @@ services:
     volumes:
       - aicc_call_pg:/var/lib/postgresql/data
     networks: [aicc_call_net]
+    logging: *default-logging
+    deploy:
+      resources:
+        limits: { cpus: '2.0', memory: 2G }
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
       interval: 5s
       timeout: 5s
       retries: 20
+    security_opt: ['no-new-privileges:true']
 
   redis:
     image: redis:7-alpine
@@ -33,15 +44,24 @@ services:
         'yes',
         '--requirepass',
         '${REDIS_PASSWORD}',
+        '--maxmemory',
+        '512mb',
+        '--maxmemory-policy',
+        'allkeys-lru',
       ]
     volumes:
       - aicc_call_redis:/data
     networks: [aicc_call_net]
+    logging: *default-logging
+    deploy:
+      resources:
+        limits: { cpus: '1.0', memory: 768M }
     healthcheck:
-      test: ['CMD-SHELL', 'redis-cli -a "$$REDIS_PASSWORD" ping | grep PONG']
+      test: ['CMD-SHELL', 'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep PONG']
       interval: 5s
       timeout: 3s
       retries: 20
+    security_opt: ['no-new-privileges:true']
 
   minio:
     image: minio/minio:latest
@@ -54,21 +74,33 @@ services:
     volumes:
       - aicc_call_minio:/data
     networks: [aicc_call_net]
+    logging: *default-logging
+    deploy:
+      resources:
+        limits: { cpus: '1.0', memory: 1G }
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://127.0.0.1:9000/minio/health/live']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    security_opt: ['no-new-privileges:true']
 
   minio-init:
     image: minio/mc:latest
     container_name: aicc-call-minio-init
     depends_on:
-      - minio
+      minio:
+        condition: service_healthy
     environment:
       S3_ACCESS_KEY: ${S3_ACCESS_KEY}
       S3_SECRET_KEY: ${S3_SECRET_KEY}
       S3_BUCKET: ${S3_BUCKET}
     entrypoint: >
       /bin/sh -c "
-      sleep 3;
       mc alias set local http://minio:9000 $$S3_ACCESS_KEY $$S3_SECRET_KEY &&
       mc mb --ignore-existing local/$$S3_BUCKET &&
+      mc version enable local/$$S3_BUCKET || true &&
       echo bucket_ok
       "
     networks: [aicc_call_net]
@@ -80,6 +112,8 @@ services:
       dockerfile: apps/api/Dockerfile
     container_name: aicc-call-api
     restart: unless-stopped
+    init: true
+    stop_grace_period: 45s
     env_file: [.env.prod]
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
@@ -100,14 +134,19 @@ services:
       redis:
         condition: service_healthy
       minio:
-        condition: service_started
+        condition: service_healthy
     networks: [aicc_call_net]
+    logging: *default-logging
+    deploy:
+      resources:
+        limits: { cpus: '2.0', memory: 1536M }
     healthcheck:
-      test: ['CMD-SHELL', 'node -e "fetch(\"http://127.0.0.1:4000/api/v1/health\").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"']
+      test: ['CMD-SHELL', 'node -e "fetch(\"http://127.0.0.1:4000/api/v1/health\").then(async r=>{const j=await r.json();process.exit(r.ok&&j.status===\"ok\"?0:1)}).catch(()=>process.exit(1))"']
       interval: 15s
       timeout: 5s
       retries: 10
-      start_period: 40s
+      start_period: 50s
+    security_opt: ['no-new-privileges:true']
 
   web:
     build:
@@ -117,13 +156,26 @@ services:
         NEXT_PUBLIC_API_URL: https://call.devflix.uz
     container_name: aicc-call-web
     restart: unless-stopped
+    init: true
     environment:
       NODE_ENV: production
     ports:
       - '127.0.0.1:13100:3000'
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     networks: [aicc_call_net]
+    logging: *default-logging
+    deploy:
+      resources:
+        limits: { cpus: '1.0', memory: 768M }
+    healthcheck:
+      test: ['CMD-SHELL', 'node -e "fetch(\"http://127.0.0.1:3000/\").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    security_opt: ['no-new-privileges:true']
 
   telephony:
     build:
@@ -131,6 +183,8 @@ services:
       dockerfile: apps/telephony/Dockerfile
     container_name: aicc-call-telephony
     restart: unless-stopped
+    init: true
+    stop_grace_period: 60s
     env_file: [.env.prod]
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
@@ -146,7 +200,16 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      asterisk:
+        condition: service_healthy
+      ai-worker:
+        condition: service_started
     networks: [aicc_call_net]
+    logging: *default-logging
+    deploy:
+      resources:
+        limits: { cpus: '1.5', memory: 1G }
+    security_opt: ['no-new-privileges:true']
 
   ai-worker:
     build:
@@ -154,27 +217,39 @@ services:
       dockerfile: apps/ai-worker/Dockerfile
     container_name: aicc-call-ai-worker
     restart: unless-stopped
+    init: true
     env_file: [.env.prod]
     environment:
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       AI_WORKER_PORT: '4200'
       AUDIOSOCKET_PORT: '8090'
-      # OPENAI_* va STT_* `.env.prod` dan keladi (env_file)
+      # AudioSocket faqat Docker tarmog'ida — host port YO'Q
+    # ports: faqat debug uchun HTTP health (localhost)
     ports:
       - '127.0.0.1:14102:4200'
-      - '127.0.0.1:18090:8090'
     depends_on:
       redis:
         condition: service_healthy
     networks: [aicc_call_net]
+    logging: *default-logging
+    deploy:
+      resources:
+        limits: { cpus: '2.0', memory: 1536M }
+    healthcheck:
+      test: ['CMD-SHELL', 'node -e "fetch(\"http://127.0.0.1:4200/internal/health\").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    security_opt: ['no-new-privileges:true']
 
-  # Softfon uchun. SIP/RTP ochiq emas — faqat localhost ARI/WSS (boshqa dasturlarga xavfsiz).
   asterisk:
     build:
       context: ./asterisk
       dockerfile: Dockerfile
     container_name: aicc-call-asterisk
     restart: unless-stopped
+    stop_grace_period: 60s
     environment:
       ARI_USER: ${ARI_USER}
       ARI_PASSWORD: ${ARI_PASSWORD}
@@ -186,12 +261,17 @@ services:
       - '127.0.0.1:18088:8088'
       - '127.0.0.1:18089:8089'
     networks: [aicc_call_net]
+    logging: *default-logging
+    deploy:
+      resources:
+        limits: { cpus: '2.0', memory: 1G }
     healthcheck:
       test: ['CMD-SHELL', 'asterisk -rx "core show version" || exit 1']
       interval: 15s
       timeout: 5s
       retries: 12
       start_period: 40s
+    security_opt: ['no-new-privileges:true']
 
 networks:
   aicc_call_net:
