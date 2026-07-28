@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { KeyRound, Pencil, Plus, Search } from 'lucide-react';
+import { KeyRound, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ROLES, hasPermission, type Role } from '@aicc/shared';
 import { api } from '@/lib/api-client';
@@ -64,6 +64,15 @@ export function UsersTab() {
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const remove = useMutation({
+    mutationFn: (id: string) => api.delete(`/admin/users/${id}`),
+    onSuccess: () => {
+      toast.success("Foydalanuvchi o'chirildi");
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   return (
     <Card>
       <CardHeader
@@ -72,7 +81,7 @@ export function UsersTab() {
         action={
           canWrite ? (
             <Button size="sm" onClick={() => setCreating(true)}>
-              <Plus className="size-4" /> Qo'shish
+              <Plus className="size-4" /> Qo&apos;shish
             </Button>
           ) : null
         }
@@ -169,6 +178,26 @@ export function UsersTab() {
                           onClick={() => toggleActive.mutate(user)}
                         >
                           {user.isActive ? 'Bloklash' : 'Faollashtirish'}
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          aria-label="O'chirish"
+                          title="O'chirish"
+                          disabled={user.id === me?.id || remove.isPending}
+                          className="text-[var(--color-negative)]"
+                          onClick={() => {
+                            if (
+                              !window.confirm(
+                                `"${user.fullName}" foydalanuvchisini o'chirishni tasdiqlaysizmi?`,
+                              )
+                            ) {
+                              return;
+                            }
+                            remove.mutate(user.id);
+                          }}
+                        >
+                          <Trash2 className="size-4" />
                         </Button>
                       </div>
                     ) : null}

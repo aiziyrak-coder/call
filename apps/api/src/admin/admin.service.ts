@@ -193,6 +193,39 @@ export class AdminService {
     return { revoked: result.count };
   }
 
+  /** Foydalanuvchini butunlay o'chiradi (o'zini va oxirgi adminni o'chirish taqiqlanadi). */
+  async removeUser(admin: AuthUser, id: string): Promise<void> {
+    if (id === admin.id) {
+      throw new BadRequestException("O'z hisobingizni o'chira olmaysiz");
+    }
+
+    const existing = await this.prisma.user.findFirst({
+      where: { id, tenantId: admin.tenantId },
+      select: { id: true, roles: true, fullName: true },
+    });
+    if (!existing) throw new NotFoundException('Foydalanuvchi topilmadi');
+
+    if (existing.roles.includes('ADMIN')) {
+      const otherAdmins = await this.prisma.user.count({
+        where: {
+          tenantId: admin.tenantId,
+          isActive: true,
+          id: { not: id },
+          roles: { has: 'ADMIN' },
+        },
+      });
+      if (otherAdmins === 0) {
+        throw new BadRequestException("Oxirgi administratorni o'chirib bo'lmaydi");
+      }
+    }
+
+    await this.prisma.refreshToken.updateMany({
+      where: { userId: id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    await this.prisma.user.delete({ where: { id } });
+  }
+
   private async assertExtensionFree(tenantId: string, extension?: string | null): Promise<void> {
     if (!extension) return;
     const taken = await this.prisma.user.findFirst({

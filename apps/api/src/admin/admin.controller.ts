@@ -61,6 +61,15 @@ export class AdminController {
     return this.admin.revokeSessions(user, id);
   }
 
+  @Delete('users/:id')
+  @HttpCode(204)
+  @RequirePermissions('user:write')
+  @Audit('user.delete', 'user')
+  @ApiOperation({ summary: "Foydalanuvchini o'chirish" })
+  async removeUser(@CurrentUser() user: AuthUser, @Param('id') id: string): Promise<void> {
+    await this.admin.removeUser(user, id);
+  }
+
   // ---------------------------------------------------------------- navbatlar
 
   @Get('queues')
