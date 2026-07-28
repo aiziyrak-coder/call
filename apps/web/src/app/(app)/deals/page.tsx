@@ -115,7 +115,7 @@ export default function DealsPage() {
         {board.data.stages.map((stage) => (
           <div
             key={stage.id}
-            className="flex w-72 shrink-0 flex-col rounded-[var(--radius-panel)] border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)]"
+            className="glass flex w-72 shrink-0 flex-col rounded-[var(--radius-panel)]"
             onDragOver={(event) => {
               if (!drag) return;
               event.preventDefault();
@@ -167,12 +167,12 @@ export default function DealsPage() {
                     drop(stage.id, index);
                   }}
                   className={cn(
-                    'group rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface)] p-2.5',
+                    'pressable group rounded-[0.9rem] border border-[var(--color-border-subtle)] bg-white/50 p-3 dark:bg-white/[0.06]',
                     canWrite && 'cursor-grab active:cursor-grabbing',
                     drag?.dealId === deal.id && 'opacity-40',
                     dropTarget?.stageId === stage.id &&
                       dropTarget.index === index &&
-                      'border-[var(--color-brand)]',
+                      'border-[var(--color-brand)] shadow-[0_0_0_2px_color-mix(in_oklch,var(--color-brand)_25%,transparent)]',
                   )}
                 >
                   <div className="flex items-start gap-1.5">

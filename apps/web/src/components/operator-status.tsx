@@ -47,17 +47,20 @@ export function OperatorStatusControl() {
   };
 
   return (
-    <div className="flex items-center gap-2">
-      <Badge tone={meta.tone} className="gap-1.5">
-        <Icon className="size-3.5" />
-        {meta.label}
-        {user.statusReason ? ` — ${user.statusReason}` : ''}
+    <div className="flex min-w-0 flex-wrap items-center gap-2">
+      <Badge tone={meta.tone} className="gap-1.5 rounded-full px-2.5 py-1">
+        <Icon className="size-3.5" strokeWidth={2.25} />
+        <span className="max-w-[10rem] truncate sm:max-w-none">
+          {meta.label}
+          {user.statusReason ? ` — ${user.statusReason}` : ''}
+        </span>
       </Badge>
 
       {user.status === 'BREAK' || user.status === 'OFFLINE' ? (
         <Button
           size="sm"
           variant="success"
+          className="rounded-full"
           disabled={pending}
           onClick={() => void change('AVAILABLE')}
         >
@@ -68,14 +71,15 @@ export function OperatorStatusControl() {
           <Button
             size="sm"
             variant="secondary"
+            className="rounded-full"
             disabled={pending}
             onClick={() => setShowReasons((value) => !value)}
           >
-            <Coffee className="size-3.5" /> Tanaffus
+            <Coffee className="size-3.5" strokeWidth={2.25} /> Tanaffus
           </Button>
           {showReasons ? (
             <Select
-              className="h-8 w-40 text-xs"
+              className="h-9 w-40 rounded-full text-xs"
               defaultValue=""
               onChange={(event) => {
                 if (event.target.value) void change('BREAK', event.target.value);

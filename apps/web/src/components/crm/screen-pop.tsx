@@ -48,18 +48,18 @@ export function ScreenPop() {
 
   return (
     <>
-      <Card className="fixed bottom-4 right-4 z-40 w-80 shadow-xl">
-        <div className="flex items-center justify-between gap-2 border-b border-[var(--color-border-subtle)] px-4 py-2.5">
-          <span className="flex items-center gap-2 text-xs font-medium text-[var(--color-brand)]">
-            <PhoneIncoming className="size-3.5" /> Kiruvchi qo'ng'iroq
+      <Card className="fixed bottom-4 right-4 z-40 w-80 animate-sheet-up shadow-[0_20px_50px_oklch(30%_0.04_250_/_0.2)]">
+        <div className="flex items-center justify-between gap-2 px-4 py-3">
+          <span className="flex items-center gap-2 text-[12px] font-semibold text-[var(--color-brand)]">
+            <PhoneIncoming className="size-3.5" strokeWidth={2.25} /> Kiruvchi qo'ng'iroq
           </span>
           <button
             type="button"
             onClick={() => setDismissed(true)}
             aria-label="Yopish"
-            className="rounded p-1 text-[var(--color-text-muted)] hover:bg-black/5 dark:hover:bg-white/5"
+            className="pressable flex size-8 items-center justify-center rounded-full bg-black/[0.04] text-[var(--color-text-muted)] dark:bg-white/10"
           >
-            <X className="size-3.5" />
+            <X className="size-3.5" strokeWidth={2.25} />
           </button>
         </div>
 

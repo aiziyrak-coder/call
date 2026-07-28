@@ -75,7 +75,14 @@ export function Providers({ children }: { children: ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
         <AuthBootstrap>{children}</AuthBootstrap>
-        <Toaster position="top-right" richColors closeButton />
+        <Toaster
+          position="top-center"
+          closeButton
+          toastOptions={{
+            className:
+              '!rounded-2xl !border !border-[var(--color-border-subtle)] !bg-[var(--color-glass)] !backdrop-blur-xl !text-[var(--color-text-primary)] !shadow-[var(--shadow-glass)]',
+          }}
+        />
       </ThemeProvider>
     </QueryClientProvider>
   );

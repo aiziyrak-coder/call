@@ -15,14 +15,12 @@ export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
-  // Server va klient HTML mos kelishi uchun mount bo'lgunga qadar hech narsa
-  // ko'rsatilmaydi (mavzu faqat brauzerda ma'lum).
   useEffect(() => setMounted(true), []);
-  if (!mounted) return <div className="h-8 w-24" />;
+  if (!mounted) return <div className="h-9 w-[6.75rem]" />;
 
   return (
     <div
-      className="flex items-center gap-0.5 rounded-lg border border-[var(--color-border-subtle)] p-0.5"
+      className="glass flex items-center gap-0.5 rounded-full p-1"
       role="group"
       aria-label="Mavzu"
     >
@@ -34,13 +32,13 @@ export function ThemeToggle() {
           title={label}
           aria-pressed={theme === value}
           className={cn(
-            'flex size-11 items-center justify-center rounded-md transition-colors sm:size-7',
+            'pressable flex size-8 items-center justify-center rounded-full transition-all duration-200 sm:size-7',
             theme === value
-              ? 'bg-[var(--color-brand)]/12 text-[var(--color-brand)]'
-              : 'text-[var(--color-text-muted)] hover:bg-black/5 dark:hover:bg-white/5',
+              ? 'bg-white/90 text-[var(--color-brand)] shadow-sm dark:bg-white/20'
+              : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]',
           )}
         >
-          <Icon className="size-3.5" />
+          <Icon className="size-3.5" strokeWidth={2.25} />
         </button>
       ))}
     </div>

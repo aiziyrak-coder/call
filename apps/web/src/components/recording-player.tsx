@@ -82,9 +82,9 @@ export function RecordingPlayer({ callId, recording }: RecordingPlayerProps) {
   const total = recording.durationSec || audioRef.current?.duration || 0;
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] px-3 py-2">
-      <Button size="icon" variant="secondary" onClick={() => void toggle()} disabled={loading}>
-        {playing ? <Pause className="size-4" /> : <Play className="size-4" />}
+    <div className="glass flex items-center gap-3 rounded-2xl px-3 py-2.5">
+      <Button size="icon" variant="secondary" className="rounded-full" onClick={() => void toggle()} disabled={loading}>
+        {playing ? <Pause className="size-4" strokeWidth={2.25} /> : <Play className="size-4" strokeWidth={2.25} />}
       </Button>
 
       <input

@@ -49,14 +49,16 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">Salom, {user?.fullName.split(' ')[0]}</h1>
-        <p className="text-sm text-[var(--color-text-muted)]">
+      <div className="animate-fade-up">
+        <h1 className="text-[28px] font-semibold tracking-[-0.04em]">
+          Salom, {user?.fullName.split(' ')[0]}
+        </h1>
+        <p className="mt-1 text-[14px] text-[var(--color-text-muted)]">
           Bugungi ish holati va oxirgi suhbatlar
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
         <StatCard
           icon={PhoneCall}
           label="Faol suhbatlar"
@@ -179,20 +181,20 @@ function StatCard({
   hint?: string;
   tone?: 'brand' | 'negative';
 }) {
+  const accent = tone === 'negative' ? 'var(--color-negative)' : 'var(--color-brand)';
   return (
-    <Card className="p-4">
-      <div className="flex items-center gap-2 text-[var(--color-text-muted)]">
-        <Icon
-          className={
-            tone === 'negative'
-              ? 'size-4 text-[var(--color-negative)]'
-              : 'size-4 text-[var(--color-brand)]'
-          }
-        />
-        <span className="text-xs">{label}</span>
+    <Card className="p-4 sm:p-5">
+      <div className="flex items-center gap-2.5">
+        <div
+          className="flex size-9 items-center justify-center rounded-[0.85rem]"
+          style={{ background: `color-mix(in oklch, ${accent} 14%, transparent)`, color: accent }}
+        >
+          <Icon className="size-[18px]" strokeWidth={2.25} />
+        </div>
+        <span className="text-[12px] font-semibold text-[var(--color-text-muted)]">{label}</span>
       </div>
-      <p className="mt-2 text-2xl font-semibold tabular-nums">{value}</p>
-      {hint ? <p className="text-[11px] text-[var(--color-text-muted)]">{hint}</p> : null}
+      <p className="mt-3 text-[28px] font-semibold tracking-[-0.03em] tabular-nums">{value}</p>
+      {hint ? <p className="mt-0.5 text-[11px] text-[var(--color-text-muted)]">{hint}</p> : null}
     </Card>
   );
 }

@@ -151,16 +151,27 @@ export function SoftphonePanel() {
 
   return (
     <Card className="flex w-full flex-col overflow-hidden">
-      <div className="flex items-center justify-between border-b border-[var(--color-border-subtle)] px-4 py-3">
-        <div className="flex items-center gap-2">
-          {phone.ready ? (
-            <Wifi className="size-4 text-[var(--color-positive)]" />
-          ) : (
-            <WifiOff className="size-4 text-[var(--color-text-muted)]" />
-          )}
-          <span className="text-sm font-semibold">Softfon</span>
+      <div className="flex items-center justify-between px-4 py-3.5">
+        <div className="flex items-center gap-2.5">
+          <div
+            className={cn(
+              'flex size-8 items-center justify-center rounded-full',
+              phone.ready
+                ? 'bg-[var(--color-positive)]/15 text-[var(--color-positive)]'
+                : 'bg-black/5 text-[var(--color-text-muted)] dark:bg-white/10',
+            )}
+          >
+            {phone.ready ? (
+              <Wifi className="size-3.5" strokeWidth={2.25} />
+            ) : (
+              <WifiOff className="size-3.5" strokeWidth={2.25} />
+            )}
+          </div>
+          <span className="text-[15px] font-semibold tracking-[-0.02em]">Softfon</span>
         </div>
-        <Badge tone={statusBadge.tone}>{statusBadge.text}</Badge>
+        <Badge tone={statusBadge.tone} className="rounded-full">
+          {statusBadge.text}
+        </Badge>
       </div>
 
       {/* Faol yoki kiruvchi qo'ng'iroq kartochkasi */}
@@ -214,15 +225,14 @@ export function SoftphonePanel() {
       )}
 
       {/* Boshqaruv tugmalari */}
-      <div className="flex flex-wrap items-center justify-center gap-2 px-4 py-4">
+      <div className="flex flex-wrap items-center justify-center gap-2.5 px-4 py-4">
         {phone.state === 'ringing' ? (
           <>
-            <Button variant="success" onClick={() => void phone.answer()} className="flex-1">
-              <Phone className="size-4" /> Qabul qilish
-              <kbd className="ml-1 rounded bg-black/20 px-1 text-[10px]">F9</kbd>
+            <Button variant="success" onClick={() => void phone.answer()} className="flex-1 rounded-full">
+              <Phone className="size-4" strokeWidth={2.25} /> Qabul qilish
             </Button>
-            <Button variant="danger" onClick={() => void phone.hangup()} className="flex-1">
-              <PhoneOff className="size-4" /> Rad etish
+            <Button variant="danger" onClick={() => void phone.hangup()} className="flex-1 rounded-full">
+              <PhoneOff className="size-4" strokeWidth={2.25} /> Rad etish
             </Button>
           </>
         ) : inCall || phone.state === 'calling' ? (
@@ -230,46 +240,53 @@ export function SoftphonePanel() {
             <Button
               variant="secondary"
               size="icon"
+              className="rounded-full"
               onClick={() => phone.toggleMute()}
               title="Mikrofon (Ctrl+M)"
               aria-pressed={call?.muted ?? false}
             >
               {call?.muted ? (
-                <MicOff className="size-4 text-[var(--color-negative)]" />
+                <MicOff className="size-4 text-[var(--color-negative)]" strokeWidth={2.25} />
               ) : (
-                <Mic className="size-4" />
+                <Mic className="size-4" strokeWidth={2.25} />
               )}
             </Button>
             <Button
               variant="secondary"
               size="icon"
+              className="rounded-full"
               onClick={() => void phone.toggleHold()}
               disabled={!inCall}
               title="Kutish (F8)"
               aria-pressed={call?.held ?? false}
             >
-              {call?.held ? <Play className="size-4" /> : <Pause className="size-4" />}
+              {call?.held ? (
+                <Play className="size-4" strokeWidth={2.25} />
+              ) : (
+                <Pause className="size-4" strokeWidth={2.25} />
+              )}
             </Button>
             <Button
               variant="secondary"
               size="icon"
+              className="rounded-full"
               onClick={() => setShowDialpad((value) => !value)}
               title="DTMF klaviaturasi"
             >
-              <Grid3x3 className="size-4" />
+              <Grid3x3 className="size-4" strokeWidth={2.25} />
             </Button>
             <Button
               variant="secondary"
               size="icon"
+              className="rounded-full"
               onClick={() => setShowTransfer((value) => !value)}
               disabled={!inCall}
               title="Transfer"
             >
-              <Shuffle className="size-4" />
+              <Shuffle className="size-4" strokeWidth={2.25} />
             </Button>
-            <Button variant="danger" onClick={() => void phone.hangup()}>
-              <PhoneOff className="size-4" /> Tugatish
-              <kbd className="ml-1 rounded bg-black/20 px-1 text-[10px]">F10</kbd>
+            <Button variant="danger" className="rounded-full" onClick={() => void phone.hangup()}>
+              <PhoneOff className="size-4" strokeWidth={2.25} /> Tugatish
             </Button>
           </>
         ) : (
@@ -277,19 +294,19 @@ export function SoftphonePanel() {
             <Button
               variant="secondary"
               size="icon"
+              className="rounded-full"
               onClick={() => setShowDialpad((value) => !value)}
               title="Raqam terish"
             >
-              <Grid3x3 className="size-4" />
+              <Grid3x3 className="size-4" strokeWidth={2.25} />
             </Button>
             <Button
               variant="success"
               onClick={() => void phone.dial(dialValue)}
               disabled={!dialValue || !phone.ready}
-              className="flex-1"
+              className="flex-1 rounded-full"
             >
-              <Phone className="size-4" /> Qo&apos;ng&apos;iroq qilish
-              <kbd className="ml-1 rounded bg-black/20 px-1 text-[10px]">F9</kbd>
+              <Phone className="size-4" strokeWidth={2.25} /> Qo&apos;ng&apos;iroq qilish
             </Button>
           </>
         )}
@@ -327,15 +344,17 @@ export function SoftphonePanel() {
       ) : null}
 
       {showDialpad ? (
-        <div className="grid grid-cols-3 gap-2 border-t border-[var(--color-border-subtle)] px-4 py-3">
+        <div className="grid grid-cols-3 gap-2.5 px-5 py-4">
           {DIALPAD_KEYS.map((digit) => (
             <button
               key={digit}
               type="button"
               onClick={() => pressDigit(digit)}
               className={cn(
-                'h-11 rounded-lg border border-[var(--color-border-subtle)] font-mono text-base',
-                'transition-colors hover:border-[var(--color-brand)] hover:bg-[var(--color-brand)]/8',
+                'pressable flex h-14 items-center justify-center rounded-full',
+                'bg-black/[0.05] text-[22px] font-semibold tracking-tight dark:bg-white/[0.08]',
+                'hover:bg-black/[0.08] dark:hover:bg-white/[0.12]',
+                'active:bg-[var(--color-brand)]/15',
               )}
             >
               {digit}

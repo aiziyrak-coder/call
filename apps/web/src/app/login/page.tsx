@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Headphones } from 'lucide-react';
+import { Headphones, LockKeyhole } from 'lucide-react';
 import { api, tokenStore } from '@/lib/api-client';
 import { useAuthStore } from '@/lib/stores';
-import { Button, Card, Input, Spinner } from '@/components/ui';
+import { Button, Input, Spinner } from '@/components/ui';
 import type { CurrentUser, LoginResponse } from '@/lib/types';
 
 export default function LoginPage() {
@@ -63,19 +63,37 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-6">
-      <Card className="w-full max-w-sm p-8">
-        <div className="mb-6 flex flex-col items-center gap-2">
-          <div className="flex size-12 items-center justify-center rounded-xl bg-[var(--color-brand)]/12">
-            <Headphones className="size-6 text-[var(--color-brand)]" />
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden p-6">
+      {/* Liquid orbs */}
+      <div
+        className="pointer-events-none absolute -left-24 top-1/4 size-72 rounded-full opacity-60 blur-3xl"
+        style={{ background: 'color-mix(in oklch, var(--color-brand) 35%, transparent)' }}
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute -right-16 bottom-1/4 size-80 rounded-full opacity-40 blur-3xl"
+        style={{ background: 'color-mix(in oklch, var(--color-brand) 25%, oklch(80% 0.05 230))' }}
+        aria-hidden
+      />
+
+      <div className="glass-strong animate-fade-up relative w-full max-w-[22rem] overflow-hidden rounded-[1.75rem] p-8">
+        <div className="mb-8 flex flex-col items-center gap-3 text-center">
+          <div className="flex size-16 items-center justify-center rounded-[1.35rem] bg-[var(--color-brand)] text-white shadow-[0_12px_32px_color-mix(in_oklch,var(--color-brand)_40%,transparent)]">
+            {mfaToken ? (
+              <LockKeyhole className="size-7" strokeWidth={2} />
+            ) : (
+              <Headphones className="size-7" strokeWidth={2} />
+            )}
           </div>
-          <h1 className="text-xl font-semibold">AiCC</h1>
-          <p className="text-sm text-[var(--color-text-muted)]">
-            {mfaToken ? 'Tasdiqlash kodini kiriting' : 'Tizimga kirish'}
-          </p>
+          <div>
+            <h1 className="text-[28px] font-semibold tracking-[-0.04em]">AiCC</h1>
+            <p className="mt-1 text-[14px] text-[var(--color-text-muted)]">
+              {mfaToken ? 'Tasdiqlash kodini kiriting' : 'Call-markazga xush kelibsiz'}
+            </p>
+          </div>
         </div>
 
-        <form onSubmit={submit} className="space-y-3">
+        <form onSubmit={submit} className="space-y-3.5">
           {mfaToken ? (
             <Input
               value={code}
@@ -83,7 +101,7 @@ export default function LoginPage() {
               placeholder="000000"
               inputMode="numeric"
               autoComplete="one-time-code"
-              className="text-center font-mono text-lg tracking-[0.4em]"
+              className="h-14 text-center font-semibold text-2xl tracking-[0.45em]"
               autoFocus
               required
             />
@@ -110,16 +128,19 @@ export default function LoginPage() {
           )}
 
           {error ? (
-            <p role="alert" className="text-sm text-[var(--color-negative)]">
+            <p
+              role="alert"
+              className="rounded-xl bg-[var(--color-negative)]/10 px-3 py-2 text-[13px] font-medium text-[var(--color-negative)]"
+            >
               {error}
             </p>
           ) : null}
 
-          <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? <Spinner /> : mfaToken ? 'Tasdiqlash' : 'Kirish'}
+          <Button type="submit" className="mt-1 h-12 w-full rounded-2xl text-[15px]" disabled={pending}>
+            {pending ? <Spinner /> : mfaToken ? 'Tasdiqlash' : 'Davom etish'}
           </Button>
         </form>
-      </Card>
+      </div>
     </main>
   );
 }

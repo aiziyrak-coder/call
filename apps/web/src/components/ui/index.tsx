@@ -13,24 +13,25 @@ import {
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-// Kichik UI to'plami — tashqi komponent kutubxonasiga bog'lanmaslik uchun
-// faqat kerakli primitivlar Tailwind ustida yozilgan.
-
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
 type ButtonSize = 'sm' | 'md' | 'lg' | 'icon';
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
-  primary: 'bg-[var(--color-brand)] text-white hover:bg-[var(--color-brand-strong)]',
+  primary:
+    'bg-[var(--color-brand)] text-white shadow-[0_4px_16px_color-mix(in_oklch,var(--color-brand)_35%,transparent)] hover:bg-[var(--color-brand-strong)] hover:shadow-[0_6px_20px_color-mix(in_oklch,var(--color-brand)_40%,transparent)]',
   secondary:
-    'bg-[var(--color-surface-raised)] text-[var(--color-text-primary)] border border-[var(--color-border-subtle)] hover:border-[var(--color-brand)]',
-  ghost: 'text-[var(--color-text-muted)] hover:bg-black/5 dark:hover:bg-white/5',
-  danger: 'bg-[var(--color-negative)] text-white hover:opacity-90',
-  success: 'bg-[var(--color-positive)] text-white hover:opacity-90',
+    'glass text-[var(--color-text-primary)] hover:bg-white/50 dark:hover:bg-white/10',
+  ghost:
+    'text-[var(--color-text-muted)] hover:bg-black/[0.04] dark:hover:bg-white/[0.08]',
+  danger:
+    'bg-[var(--color-negative)] text-white shadow-[0_4px_14px_color-mix(in_oklch,var(--color-negative)_30%,transparent)] hover:opacity-95',
+  success:
+    'bg-[var(--color-positive)] text-white shadow-[0_4px_14px_color-mix(in_oklch,var(--color-positive)_30%,transparent)] hover:opacity-95',
 };
 
 const BUTTON_SIZES: Record<ButtonSize, string> = {
-  sm: 'min-h-11 h-11 px-3 text-xs sm:min-h-8 sm:h-8',
-  md: 'min-h-11 h-11 px-4 text-sm sm:min-h-10 sm:h-10',
+  sm: 'min-h-10 h-10 px-3.5 text-[13px] sm:min-h-8 sm:h-8',
+  md: 'min-h-11 h-11 px-5 text-[15px] sm:min-h-10 sm:h-10',
   lg: 'min-h-12 h-12 px-6 text-base',
   icon: 'min-h-11 min-w-11 h-11 w-11',
 };
@@ -48,8 +49,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     <button
       ref={ref}
       className={cn(
-        'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors',
-        'disabled:cursor-not-allowed disabled:opacity-50',
+        'pressable inline-flex items-center justify-center gap-2 rounded-[var(--radius-control)] font-semibold tracking-[-0.01em]',
+        'disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none',
         BUTTON_VARIANTS[variant],
         BUTTON_SIZES[size],
         className,
@@ -59,35 +60,23 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   );
 });
 
+const fieldChrome =
+  'w-full rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] ' +
+  'bg-white/45 dark:bg-white/[0.06] backdrop-blur-xl ' +
+  'px-3.5 text-[15px] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] ' +
+  'transition-[border-color,box-shadow] duration-200 ' +
+  'focus:border-[var(--color-brand)] focus:outline-none focus:shadow-[0_0_0_3px_color-mix(in_oklch,var(--color-brand)_22%,transparent)]';
+
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
   function Input({ className, ...props }, ref) {
-    return (
-      <input
-        ref={ref}
-        className={cn(
-          'h-10 w-full rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)]',
-          'px-3 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)]',
-          'focus:border-[var(--color-brand)] focus:outline-none',
-          className,
-        )}
-        {...props}
-      />
-    );
+    return <input ref={ref} className={cn('h-11', fieldChrome, className)} {...props} />;
   },
 );
 
 export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(
   function Select({ className, children, ...props }, ref) {
     return (
-      <select
-        ref={ref}
-        className={cn(
-          'h-10 w-full rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)]',
-          'px-3 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-brand)] focus:outline-none',
-          className,
-        )}
-        {...props}
-      >
+      <select ref={ref} className={cn('h-11', fieldChrome, className)} {...props}>
         {children}
       </select>
     );
@@ -98,8 +87,7 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn(
-        'rounded-[var(--radius-panel)] border border-[var(--color-border-subtle)]',
-        'bg-[var(--color-surface-raised)] shadow-sm',
+        'glass animate-fade-up rounded-[var(--radius-panel)] overflow-hidden',
         className,
       )}
       {...props}
@@ -119,9 +107,11 @@ export function CardHeader({
   return (
     <div className="flex items-start justify-between gap-4 border-b border-[var(--color-border-subtle)] px-5 py-4">
       <div>
-        <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">{title}</h2>
+        <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-[var(--color-text-primary)]">
+          {title}
+        </h2>
         {description ? (
-          <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{description}</p>
+          <p className="mt-0.5 text-[13px] text-[var(--color-text-muted)]">{description}</p>
         ) : null}
       </div>
       {action}
@@ -132,11 +122,11 @@ export function CardHeader({
 type BadgeTone = 'neutral' | 'brand' | 'positive' | 'warning' | 'negative';
 
 const BADGE_TONES: Record<BadgeTone, string> = {
-  neutral: 'bg-black/5 text-[var(--color-text-muted)] dark:bg-white/10',
+  neutral: 'bg-black/[0.05] text-[var(--color-text-muted)] dark:bg-white/10',
   brand: 'bg-[var(--color-brand)]/12 text-[var(--color-brand)]',
-  positive: 'bg-[var(--color-positive)]/15 text-[var(--color-positive)]',
-  warning: 'bg-[var(--color-warning)]/18 text-[var(--color-warning)]',
-  negative: 'bg-[var(--color-negative)]/15 text-[var(--color-negative)]',
+  positive: 'bg-[var(--color-positive)]/14 text-[var(--color-positive)]',
+  warning: 'bg-[var(--color-warning)]/16 text-[oklch(45%_0.12_75)] dark:text-[var(--color-warning)]',
+  negative: 'bg-[var(--color-negative)]/14 text-[var(--color-negative)]',
 };
 
 export function Badge({
@@ -147,7 +137,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
+        'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide',
         BADGE_TONES[tone],
         className,
       )}
@@ -166,26 +156,23 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 px-6 py-12 text-center">
-      <p className="text-sm font-medium text-[var(--color-text-primary)]">{title}</p>
-      {hint ? <p className="max-w-sm text-xs text-[var(--color-text-muted)]">{hint}</p> : null}
-      {action ? <div className="mt-1">{action}</div> : null}
+    <div className="animate-fade-up flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
+      <div className="mb-1 flex size-14 items-center justify-center rounded-full bg-[var(--color-brand)]/10 text-[var(--color-brand)]">
+        <span className="text-xl opacity-80" aria-hidden>
+          ◇
+        </span>
+      </div>
+      <p className="text-[15px] font-semibold tracking-[-0.02em] text-[var(--color-text-primary)]">
+        {title}
+      </p>
+      {hint ? <p className="max-w-sm text-[13px] leading-relaxed text-[var(--color-text-muted)]">{hint}</p> : null}
+      {action ? <div className="mt-2">{action}</div> : null}
     </div>
   );
 }
 
 export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return (
-    <textarea
-      className={cn(
-        'w-full rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)]',
-        'px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)]',
-        'focus:border-[var(--color-brand)] focus:outline-none',
-        className,
-      )}
-      {...props}
-    />
-  );
+  return <textarea className={cn('min-h-24 py-2.5', fieldChrome, className)} {...props} />;
 }
 
 export function Field({
@@ -198,17 +185,20 @@ export function Field({
   children: ReactNode;
 }) {
   return (
-    <label className="block space-y-1">
-      <span className="text-xs font-medium text-[var(--color-text-muted)]">{label}</span>
+    <label className="block space-y-1.5">
+      <span className="pl-0.5 text-[12px] font-semibold tracking-wide text-[var(--color-text-muted)]">
+        {label}
+      </span>
       {children}
       {hint ? (
-        <span className="block text-[11px] text-[var(--color-text-muted)]">{hint}</span>
+        <span className="block pl-0.5 text-[11px] leading-snug text-[var(--color-text-muted)]">
+          {hint}
+        </span>
       ) : null}
     </label>
   );
 }
 
-/** Oddiy modal: Escape va fon bosilganda yopiladi, fokus ichida ushlanmaydi. */
 export function Dialog({
   title,
   description,
@@ -234,7 +224,8 @@ export function Dialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-black/40 p-6 backdrop-blur-[2px]"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-auto p-6"
+      style={{ background: 'oklch(20% 0.02 250 / 0.35)', backdropFilter: 'blur(8px)' }}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -244,32 +235,31 @@ export function Dialog({
         aria-modal="true"
         aria-label={title}
         className={cn(
-          'mt-12 w-full rounded-[var(--radius-panel)] border border-[var(--color-border-subtle)]',
-          'bg-[var(--color-surface-raised)] shadow-xl',
+          'glass-strong animate-sheet-up mt-16 w-full overflow-hidden rounded-[1.5rem]',
           width,
         )}
       >
         <div className="flex items-start justify-between gap-4 border-b border-[var(--color-border-subtle)] px-5 py-4">
           <div>
-            <h2 className="text-sm font-semibold">{title}</h2>
+            <h2 className="text-[17px] font-semibold tracking-[-0.02em]">{title}</h2>
             {description ? (
-              <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{description}</p>
+              <p className="mt-0.5 text-[13px] text-[var(--color-text-muted)]">{description}</p>
             ) : null}
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Yopish"
-            className="rounded p-1 text-[var(--color-text-muted)] hover:bg-black/5 dark:hover:bg-white/5"
+            className="pressable flex size-9 items-center justify-center rounded-full bg-black/[0.04] text-[var(--color-text-muted)] hover:bg-black/[0.08] dark:bg-white/10"
           >
-            <X className="size-4" />
+            <X className="size-4" strokeWidth={2.25} />
           </button>
         </div>
 
         <div className="px-5 py-4">{children}</div>
 
         {footer ? (
-          <div className="flex justify-end gap-2 border-t border-[var(--color-border-subtle)] px-5 py-3">
+          <div className="flex justify-end gap-2 border-t border-[var(--color-border-subtle)] px-5 py-3.5">
             {footer}
           </div>
         ) : null}
@@ -288,7 +278,10 @@ export function Tabs<T extends string>({
   onChange: (value: T) => void;
 }) {
   return (
-    <div role="tablist" className="flex gap-1 border-b border-[var(--color-border-subtle)]">
+    <div
+      role="tablist"
+      className="glass inline-flex gap-0.5 rounded-[var(--radius-control)] p-1"
+    >
       {items.map((item) => (
         <button
           key={item.value}
@@ -296,17 +289,15 @@ export function Tabs<T extends string>({
           aria-selected={item.value === value}
           onClick={() => onChange(item.value)}
           className={cn(
-            'relative -mb-px border-b-2 px-3 py-2 text-sm transition-colors',
+            'pressable relative rounded-[calc(var(--radius-control)-2px)] px-3.5 py-2 text-[13px] font-semibold transition-all duration-200',
             item.value === value
-              ? 'border-[var(--color-brand)] text-[var(--color-text-primary)]'
-              : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]',
+              ? 'bg-white/80 text-[var(--color-text-primary)] shadow-sm dark:bg-white/15'
+              : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]',
           )}
         >
           {item.label}
           {item.count === undefined ? null : (
-            <span className="ml-1.5 text-[11px] tabular-nums text-[var(--color-text-muted)]">
-              {item.count}
-            </span>
+            <span className="ml-1.5 text-[11px] tabular-nums opacity-70">{item.count}</span>
           )}
         </button>
       ))}

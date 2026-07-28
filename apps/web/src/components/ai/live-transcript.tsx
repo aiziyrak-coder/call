@@ -178,7 +178,7 @@ export function LiveTranscript({ callId }: { callId: string | null }) {
           <p className="text-xs font-medium text-[var(--color-brand)]">{recommendation.title}</p>
           <p className="text-sm text-[var(--color-text-muted)]">{recommendation.detail}</p>
           {recommendation.suggestedReply ? (
-            <p className="rounded-md bg-[var(--color-surface-muted)] px-3 py-2 text-sm italic">
+            <p className="rounded-xl bg-black/[0.04] px-3 py-2 text-sm italic dark:bg-white/[0.06]">
               “{recommendation.suggestedReply}”
             </p>
           ) : null}

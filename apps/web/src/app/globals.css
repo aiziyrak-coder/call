@@ -3,35 +3,49 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * Operator kuniga 8 soat ekranga qaraydi, shuning uchun kontrast yumshoq va
- * qorong'i rejim asosiy stsenariy sifatida sozlangan.
+ * AiCC — iOS 27 Liquid Glass design system
+ * Bitta accent + neytral shisha sirtlar. Orticha rang yo'q.
  */
 @theme {
-  --color-surface: oklch(99% 0.002 250);
-  --color-surface-raised: oklch(100% 0 0);
-  --color-border-subtle: oklch(92% 0.004 250);
-  --color-text-primary: oklch(25% 0.01 250);
-  --color-text-muted: oklch(55% 0.012 250);
+  --font-sans: var(--font-aicc), ui-rounded, system-ui, sans-serif;
 
-  --color-brand: oklch(58% 0.17 258);
-  --color-brand-strong: oklch(50% 0.19 258);
+  --color-surface: oklch(96.5% 0.008 240);
+  --color-surface-raised: oklch(99% 0.004 240 / 0.72);
+  --color-glass: oklch(99% 0.004 240 / 0.82);
+  --color-border-subtle: oklch(100% 0 0 / 0.45);
+  --color-text-primary: oklch(22% 0.02 250);
+  --color-text-muted: oklch(48% 0.02 250);
 
-  --color-positive: oklch(65% 0.16 150);
-  --color-warning: oklch(75% 0.15 80);
-  --color-negative: oklch(60% 0.2 25);
+  /* Bitta asosiy accent — iOS Blue */
+  --color-brand: oklch(55% 0.19 250);
+  --color-brand-strong: oklch(48% 0.2 250);
 
-  --radius-panel: 0.75rem;
+  --color-positive: oklch(62% 0.17 150);
+  --color-warning: oklch(72% 0.14 75);
+  --color-negative: oklch(58% 0.2 25);
+
+  --radius-panel: 1.25rem;
+  --radius-control: 0.875rem;
+  --radius-pill: 999px;
+
+  --blur-glass: 28px;
+  --shadow-glass: 0 8px 32px oklch(30% 0.04 250 / 0.08), inset 0 1px 0 oklch(100% 0 0 / 0.55);
+  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .dark {
-  --color-surface: oklch(20% 0.012 255);
-  --color-surface-raised: oklch(25% 0.014 255);
-  --color-border-subtle: oklch(32% 0.014 255);
-  --color-text-primary: oklch(94% 0.005 250);
-  --color-text-muted: oklch(70% 0.012 250);
+  --color-surface: oklch(16% 0.02 250);
+  --color-surface-raised: oklch(28% 0.02 250 / 0.55);
+  --color-glass: oklch(28% 0.02 250 / 0.78);
+  --color-border-subtle: oklch(100% 0 0 / 0.12);
+  --color-text-primary: oklch(96% 0.01 250);
+  --color-text-muted: oklch(72% 0.02 250);
 
-  --color-brand: oklch(65% 0.16 258);
-  --color-brand-strong: oklch(72% 0.15 258);
+  --color-brand: oklch(68% 0.16 250);
+  --color-brand-strong: oklch(74% 0.14 250);
+
+  --shadow-glass: 0 12px 40px oklch(0% 0 0 / 0.45), inset 0 1px 0 oklch(100% 0 0 / 0.1);
 }
 
 html,
@@ -40,29 +54,167 @@ body {
 }
 
 body {
+  font-family: var(--font-sans);
   background-color: var(--color-surface);
   color: var(--color-text-primary);
   -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.011em;
 }
 
-/* Klaviatura bilan navigatsiya qilayotgan foydalanuvchi fokusni ko'rishi shart. */
+/* Liquid mesh — atmosferik fon (bitta hue oilasi) */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(ellipse 80% 60% at 10% -10%, oklch(78% 0.1 250 / 0.45), transparent 55%),
+    radial-gradient(ellipse 70% 50% at 95% 10%, oklch(82% 0.06 230 / 0.35), transparent 50%),
+    radial-gradient(ellipse 60% 45% at 50% 100%, oklch(75% 0.08 250 / 0.25), transparent 55%),
+    var(--color-surface);
+  pointer-events: none;
+}
+
+.dark body::before {
+  background:
+    radial-gradient(ellipse 70% 50% at 0% 0%, oklch(40% 0.1 250 / 0.45), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 100% 20%, oklch(35% 0.08 240 / 0.35), transparent 50%),
+    radial-gradient(ellipse 50% 40% at 40% 100%, oklch(30% 0.06 250 / 0.3), transparent 55%),
+    var(--color-surface);
+}
+
+/* Noise / glass depth */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.035;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.dark body::after {
+  opacity: 0.05;
+}
+
 :focus-visible {
-  outline: 2px solid var(--color-brand);
+  outline: 2px solid color-mix(in oklch, var(--color-brand) 70%, white);
   outline-offset: 2px;
+  border-radius: 8px;
 }
 
+/* ——— Glass primitives ——— */
+.glass {
+  background: var(--color-surface-raised);
+  backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
+  -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
+  border: 1px solid var(--color-border-subtle);
+  box-shadow: var(--shadow-glass);
+}
+
+.glass-strong {
+  background: color-mix(in oklch, var(--color-surface-raised) 88%, white);
+  backdrop-filter: blur(40px) saturate(1.6);
+  -webkit-backdrop-filter: blur(40px) saturate(1.6);
+  border: 1px solid var(--color-border-subtle);
+  box-shadow: var(--shadow-glass);
+}
+
+.dark .glass-strong {
+  background: color-mix(in oklch, var(--color-surface-raised) 90%, black);
+}
+
+.glass-hairline {
+  border-color: color-mix(in oklch, var(--color-border-subtle) 80%, transparent);
+}
+
+/* ——— Motion ——— */
 @keyframes aicc-pulse-ring {
   0% {
-    box-shadow: 0 0 0 0 color-mix(in oklch, var(--color-positive) 60%, transparent);
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--color-positive) 55%, transparent);
   }
   70% {
-    box-shadow: 0 0 0 12px transparent;
+    box-shadow: 0 0 0 14px transparent;
   }
   100% {
     box-shadow: 0 0 0 0 transparent;
   }
 }
 
+@keyframes aicc-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes aicc-sheet-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes aicc-nav-in {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 .animate-ring {
-  animation: aicc-pulse-ring 1.4s ease-out infinite;
+  animation: aicc-pulse-ring 1.5s var(--ease-spring) infinite;
+}
+
+.animate-fade-up {
+  animation: aicc-fade-up 0.55s var(--ease-spring) both;
+}
+
+.animate-sheet-up {
+  animation: aicc-sheet-up 0.45s var(--ease-ios) both;
+}
+
+.animate-nav-in {
+  animation: aicc-nav-in 0.4s var(--ease-spring) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-ring,
+  .animate-fade-up,
+  .animate-sheet-up,
+  .animate-nav-in {
+    animation: none;
+  }
+}
+
+/* Smooth interactive press */
+.pressable {
+  transition:
+    transform 0.2s var(--ease-ios),
+    background-color 0.2s var(--ease-ios),
+    box-shadow 0.25s var(--ease-spring),
+    opacity 0.2s ease;
+}
+
+.pressable:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Scrollbars — thin iOS-like */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklch, var(--color-text-muted) 35%, transparent) transparent;
 }
