@@ -12,18 +12,14 @@ const ARGON2_OPTIONS = {
   parallelism: 1,
 } as const;
 
-function digitsOnly(value: string): string {
-  return value.replace(/\D/g, '');
-}
-
 async function main() {
   console.log('Seed boshlandi...');
 
   const tenant = await prisma.tenant.upsert({
     where: { slug: 'demo' },
-    update: {},
+    update: { name: 'AiCC' },
     create: {
-      name: 'AiCC Demo',
+      name: 'AiCC',
       slug: 'demo',
       timezone: 'Asia/Tashkent',
       locale: 'uz',
@@ -146,45 +142,13 @@ async function main() {
   }
   console.log(`  ${templateSeeds.length} ta SMS shabloni tayyor`);
 
-  const operator = await prisma.user.findUnique({
-    where: { tenantId_email: { tenantId: tenant.id, email: 'operator1@aicc.uz' } },
+  // Eski seed/demo kontaktlar (agar qolgan bo'lsa) — tozalanadi.
+  const deleted = await prisma.contact.deleteMany({
+    where: { tenantId: tenant.id, source: 'seed' },
   });
-
-  const contactSeeds = [
-    { firstName: 'Aziz', lastName: 'Rahimov', phone: '+998901112233', company: 'Alfa Trade' },
-    { firstName: 'Malika', lastName: 'Tosheva', phone: '+998932224455', company: 'Beta Group' },
-    { firstName: 'Jasur', lastName: 'Ismoilov', phone: '+998973336677', company: null },
-  ];
-
-  for (const seed of contactSeeds) {
-    const phoneKey = digitsOnly(seed.phone);
-    const existing = await prisma.contact.findFirst({
-      where: { tenantId: tenant.id, primaryPhoneKey: phoneKey },
-    });
-    if (existing) continue;
-
-    await prisma.contact.create({
-      data: {
-        tenantId: tenant.id,
-        firstName: seed.firstName,
-        lastName: seed.lastName,
-        company: seed.company,
-        primaryPhoneKey: phoneKey,
-        ownerId: operator?.id ?? null,
-        source: 'seed',
-        phones: {
-          create: {
-            tenantId: tenant.id,
-            phone: seed.phone,
-            phoneKey,
-            label: 'mobil',
-            isPrimary: true,
-          },
-        },
-      },
-    });
+  if (deleted.count > 0) {
+    console.log(`  ${deleted.count} ta eski demo kontakt o'chirildi`);
   }
-  console.log(`  ${contactSeeds.length} ta demo kontakt tayyor`);
 
   console.log('Seed yakunlandi.');
 }

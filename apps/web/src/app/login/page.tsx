@@ -117,12 +117,6 @@ export default function LoginPage() {
             {pending ? <Spinner /> : mfaToken ? 'Tasdiqlash' : 'Kirish'}
           </Button>
         </form>
-
-        {process.env.NODE_ENV === 'development' ? (
-          <p className="mt-6 rounded-lg bg-black/5 p-3 text-[11px] leading-relaxed text-[var(--color-text-muted)] dark:bg-white/5">
-            Demo: <code>operator1@aicc.uz</code> / <code>Aicc!2026</code>
-          </p>
-        ) : null}
       </Card>
     </main>
   );
