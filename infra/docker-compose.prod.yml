@@ -64,8 +64,9 @@ services:
     security_opt: ['no-new-privileges:true']
 
   minio:
-    # Pin: latest da curl yo'qolishi mumkin — healthcheck ishonchliligi uchun
-    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    # Volume xl-meta v3: eski RELEASE pin formatni o'qiy olmaydi.
+    # Pin qilganda faqat joriy volume yozgan versiyadan yangiroq tag tanlang.
+    image: minio/minio:latest
     container_name: aicc-call-minio
     restart: unless-stopped
     command: ['server', '/data', '--console-address', ':9001']
@@ -92,7 +93,7 @@ services:
     security_opt: ['no-new-privileges:true']
 
   minio-init:
-    image: minio/mc:RELEASE.2024-11-17T19-35-25Z
+    image: minio/mc:latest
     container_name: aicc-call-minio-init
     depends_on:
       minio:

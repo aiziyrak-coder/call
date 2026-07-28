@@ -24,7 +24,7 @@ docker run --rm --network aicc_call_net \
   -e S3_BUCKET="${S3_BUCKET}" \
   -v "$OUT/minio:/backup" \
   --entrypoint /bin/sh \
-  minio/mc:RELEASE.2024-11-17T19-35-25Z \
+  minio/mc:latest \
   -c 'mc alias set local http://minio:9000 "$S3_ACCESS_KEY" "$S3_SECRET_KEY" && mc mirror --overwrite "local/$S3_BUCKET" /backup'
 chmod -R go-rwx "$OUT/minio" 2>/dev/null || true
 
