@@ -13,14 +13,15 @@ export function connectSocket(): Socket {
   socket = io(`${SOCKET_URL}/realtime`, {
     transports: ['websocket'],
     withCredentials: true,
-    auth: { token: tokenStore.access },
+    // Prod: cookie yetarli; dev: Bearer xotiradan
+    auth: tokenStore.access ? { token: tokenStore.access } : {},
     reconnection: true,
     reconnectionDelay: 1_000,
     reconnectionDelayMax: 10_000,
   });
 
   socket.io.on('reconnect_attempt', () => {
-    if (socket) socket.auth = { token: tokenStore.access };
+    if (socket) socket.auth = tokenStore.access ? { token: tokenStore.access } : {};
   });
 
   return socket;

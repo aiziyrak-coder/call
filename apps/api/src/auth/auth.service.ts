@@ -53,7 +53,7 @@ export class AuthService {
 
   async login(email: string, password: string, ctx: LoginContext = {}): Promise<LoginResult> {
     const normalized = email.toLowerCase().trim();
-    await this.lockout.assertNotLocked(normalized);
+    await this.lockout.assertNotLocked(normalized, ctx.ipAddress);
 
     const user = await this.prisma.user.findFirst({
       where: { email: normalized, isActive: true },
@@ -120,7 +120,7 @@ export class AuthService {
     }
     if (payload.mfa) throw new BadRequestException('Bu token allaqachon tasdiqlangan');
 
-    await this.lockout.assertNotLocked(payload.email);
+    await this.lockout.assertNotLocked(payload.email, ctx.ipAddress);
 
     const user = await this.prisma.user.findFirst({
       where: { id: payload.sub, tenantId: payload.tid, isActive: true },

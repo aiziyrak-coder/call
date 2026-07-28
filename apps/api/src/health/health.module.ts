@@ -28,13 +28,19 @@ class HealthController {
 
     return {
       status: healthy ? 'ok' : 'degraded',
-      checks: {
-        database: databaseOk ? 'ok' : 'fail',
-        cache: cacheOk ? 'ok' : 'fail',
-      },
+      checks: this.isDetail
+        ? {
+            database: databaseOk ? 'ok' : 'fail',
+            cache: cacheOk ? 'ok' : 'fail',
+          }
+        : undefined,
       uptimeSec: Math.floor(process.uptime()),
       timestamp: new Date().toISOString(),
     };
+  }
+
+  private get isDetail(): boolean {
+    return process.env.NODE_ENV !== 'production';
   }
 }
 

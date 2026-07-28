@@ -2,8 +2,8 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 const API_PREFIX = '/api/v1';
 
 /**
- * Access token faqat xotirada — XSS localStorage o'g'irlashini oldini oladi.
- * Refresh httpOnly cookie orqali (credentials: include).
+ * Dev da access token xotirada (Bearer).
+ * Prod da faqat httpOnly cookie + credentials: 'include' (XSS Bearer o'g'irlash yo'q).
  */
 let memoryAccessToken: string | null = null;
 
@@ -23,10 +23,11 @@ export const tokenStore = {
     return memoryAccessToken;
   },
   get refresh(): string | null {
-    return null; // refresh faqat httpOnly cookie
+    return null;
   },
   set(access: string, _refresh?: string): void {
-    memoryAccessToken = access;
+    // Prod brauzerda JSON access kelmaydi — cookie yetarli.
+    if (access) memoryAccessToken = access;
   },
   clear(): void {
     memoryAccessToken = null;
@@ -48,8 +49,8 @@ async function refreshTokens(): Promise<boolean> {
         tokenStore.clear();
         return false;
       }
-      const data = (await response.json()) as { accessToken: string; expiresIn?: number };
-      tokenStore.set(data.accessToken);
+      const data = (await response.json()) as { accessToken?: string; expiresIn?: number };
+      if (data.accessToken) tokenStore.set(data.accessToken);
       return true;
     } catch {
       return false;

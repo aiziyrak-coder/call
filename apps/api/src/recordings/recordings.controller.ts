@@ -1,15 +1,9 @@
-import { Controller, Delete, Get, Headers, HttpCode, Param, Query, Res } from '@nestjs/common';
+import { Controller, Delete, Get, Headers, HttpCode, Param, Res } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
-import { z } from 'zod';
-import { createZodDto } from '../common/zod';
 import { RecordingsService } from './recordings.service';
-import { Audit, CurrentUser, Public, RequirePermissions } from '../auth/decorators';
+import { Audit, CurrentUser, RequirePermissions } from '../auth/decorators';
 import type { AuthUser } from '../auth/auth.types';
-
-class StreamQueryDto extends createZodDto(
-  z.object({ token: z.string().min(20).max(4096) }),
-) {}
 
 @ApiTags('recordings')
 @Controller('recordings')
@@ -17,26 +11,25 @@ export class RecordingsController {
   constructor(private readonly recordings: RecordingsService) {}
 
   /**
-   * Oqim endpointi ataylab ochiq: brauzerdagi `<audio>` elementi `Authorization`
-   * sarlavhasini yubora olmaydi. Huquq tekshiruvi imzolangan, 5 daqiqa amal
-   * qiladigan token orqali bajariladi.
+   * Cookie-auth oqim: `<audio src>` same-origin da httpOnly cookie yuboradi.
+   * Query-string JWT yo'q — access log / Referer orqali token sizib chiqmaydi.
    */
-  @Public()
-  @Get('stream')
-  @ApiOperation({ summary: 'Yozuvni oqim sifatida berish (imzolangan token bilan)' })
+  @Get(':callId/stream')
+  @RequirePermissions('recording:read:own', 'recording:read:all')
+  @ApiOperation({ summary: 'Yozuvni oqim sifatida berish (sessiya cookie)' })
   async stream(
-    @Query() query: StreamQueryDto,
+    @CurrentUser() user: AuthUser,
+    @Param('callId') callId: string,
     @Headers('range') range: string | undefined,
     @Res() response: Response,
   ): Promise<void> {
-    const result = await this.recordings.openStream(query.token, range);
+    const result = await this.recordings.openStreamForUser(user, callId, range);
 
     response.status(range ? 206 : 200);
     response.setHeader('Content-Type', result.contentType);
     response.setHeader('Accept-Ranges', 'bytes');
     response.setHeader('Content-Length', String(result.contentLength));
     if (result.contentRange) response.setHeader('Content-Range', result.contentRange);
-    // Yozuv shaxsiy ma'lumot — oraliq keshlarda qolmasligi kerak.
     response.setHeader('Cache-Control', 'private, no-store');
 
     result.stream.pipe(response);
@@ -45,7 +38,7 @@ export class RecordingsController {
   @Get(':callId/url')
   @RequirePermissions('recording:read:own', 'recording:read:all')
   @Audit('recording.play', 'recording')
-  @ApiOperation({ summary: 'Yozuvni tinglash uchun qisqa muddatli havola' })
+  @ApiOperation({ summary: 'Yozuvni tinglash uchun same-origin havola' })
   url(@CurrentUser() user: AuthUser, @Param('callId') callId: string) {
     return this.recordings.playbackUrl(user, callId);
   }

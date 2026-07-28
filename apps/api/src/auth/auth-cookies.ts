@@ -38,12 +38,18 @@ export function clearAuthCookies(res: Response): void {
   });
 }
 
-/** Brauzerga refresh tokenni JSON da bermaymiz — faqat cookie. */
+/**
+ * Brauzerga refresh hech qachon JSON da bermaymiz.
+ * Production da access ham faqat httpOnly cookie — XSS token o'g'irlashini yo'qotadi.
+ */
 export function publicTokenResponse(tokens: {
   accessToken: string;
   refreshToken: string;
   expiresIn: number;
 }) {
+  if (isProd()) {
+    return { expiresIn: tokens.expiresIn };
+  }
   return {
     accessToken: tokens.accessToken,
     expiresIn: tokens.expiresIn,

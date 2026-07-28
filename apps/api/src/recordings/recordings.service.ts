@@ -10,7 +10,6 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
 import { resolveScope } from '@aicc/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from './storage.service';
@@ -18,14 +17,6 @@ import { safeBasename } from '../common/field-crypto.service';
 import type { AuthUser } from '../auth/auth.types';
 
 const RETENTION_SWEEP_INTERVAL_MS = 6 * 60 * 60 * 1000;
-const PLAYBACK_TOKEN_TTL_SEC = 300;
-
-interface PlaybackTokenPayload {
-  rid: string;
-  sub: string;
-  tid: string;
-  typ: 'playback';
-}
 
 @Injectable()
 export class RecordingsService implements OnModuleInit, OnModuleDestroy {
@@ -37,7 +28,6 @@ export class RecordingsService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
-    private readonly jwt: JwtService,
     private readonly config: ConfigService,
   ) {
     // Asterisk yozuvni shu katalogga tashlaydi; u bind mount orqali hostga ulangan.
@@ -142,38 +132,23 @@ export class RecordingsService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Brauzerdagi `<audio>` elementi maxsus sarlavha yubora olmaydi, shuning uchun
-   * qisqa muddatli imzolangan havola beriladi va oqim API orqali o'tadi —
-   * shifrlash kaliti serverdan chiqmaydi.
+   * Same-origin cookie-auth URL — token query stringda emas.
    */
   async playbackUrl(
     user: AuthUser,
     callId: string,
   ): Promise<{ url: string; expiresInSec: number }> {
-    const recording = await this.requireAccessible(user, callId);
-
-    const token = await this.jwt.signAsync(
-      {
-        rid: recording.id,
-        sub: user.id,
-        tid: user.tenantId,
-        typ: 'playback',
-      } satisfies PlaybackTokenPayload,
-      {
-        secret: this.config.getOrThrow<string>('JWT_SECRET'),
-        expiresIn: PLAYBACK_TOKEN_TTL_SEC,
-      },
-    );
-
+    await this.requireAccessible(user, callId);
     const base = this.config.get<string>('PUBLIC_API_URL', 'http://localhost:4000');
     return {
-      url: `${base}/api/v1/recordings/stream?token=${encodeURIComponent(token)}`,
-      expiresInSec: PLAYBACK_TOKEN_TTL_SEC,
+      url: `${base}/api/v1/recordings/${callId}/stream`,
+      expiresInSec: 0,
     };
   }
 
-  async openStream(
-    token: string,
+  async openStreamForUser(
+    user: AuthUser,
+    callId: string,
     range?: string,
   ): Promise<{
     stream: Readable;
@@ -181,23 +156,7 @@ export class RecordingsService implements OnModuleInit, OnModuleDestroy {
     contentRange?: string;
     contentType: string;
   }> {
-    let payload: PlaybackTokenPayload;
-    try {
-      payload = await this.jwt.verifyAsync<PlaybackTokenPayload>(token, {
-        secret: this.config.getOrThrow<string>('JWT_SECRET'),
-      });
-    } catch {
-      throw new ForbiddenException("Havola yaroqsiz yoki muddati o'tgan");
-    }
-    if (payload.typ !== 'playback') {
-      throw new ForbiddenException('Havola turi noto\'g\'ri');
-    }
-
-    const recording = await this.prisma.recording.findFirst({
-      where: { id: payload.rid, tenantId: payload.tid, deletedAt: null },
-    });
-    if (!recording) throw new NotFoundException('Yozuv topilmadi');
-
+    const recording = await this.requireAccessible(user, callId);
     const object = await this.storage.get(recording.objectKey, range);
     return {
       ...object,

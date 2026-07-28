@@ -8,7 +8,11 @@ import { AsteriskTelephonyProvider } from './telephony/asterisk.provider';
 import { CallRegistry } from './telephony/call-session';
 import { RoutingService } from './telephony/routing.service';
 import { StasisService } from './telephony/stasis.service';
-import { ServiceTokenGuard, TelephonyController } from './telephony/telephony.controller';
+import {
+  ServiceTokenGuard,
+  TelephonyController,
+  TelephonyHealthController,
+} from './telephony/telephony.controller';
 
 const envSchema = z.object({
   TELEPHONY_PORT: z.coerce.number().int().default(4100),
@@ -43,7 +47,7 @@ const envSchema = z.object({
     }),
     PrismaModule,
   ],
-  controllers: [TelephonyController],
+  controllers: [TelephonyHealthController, TelephonyController],
   providers: [
     AriClient,
     CallRegistry,

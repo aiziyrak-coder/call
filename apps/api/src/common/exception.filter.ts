@@ -78,7 +78,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
         const target = (exception.meta?.target as string[] | undefined)?.join(', ') ?? 'maydon';
         return {
           statusCode: HttpStatus.CONFLICT,
-          message: `Bunday yozuv allaqachon mavjud (${target})`,
+          message: this.isProd
+            ? 'Bunday yozuv allaqachon mavjud'
+            : `Bunday yozuv allaqachon mavjud (${target})`,
           error: this.isProd ? undefined : 'UniqueConstraintViolation',
           path,
           timestamp,

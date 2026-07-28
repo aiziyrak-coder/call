@@ -90,6 +90,8 @@ services:
     environment:
       ARI_USER: ${ARI_USER:-aicc}
       ARI_PASSWORD: ${ARI_PASSWORD:-aicc_ari_password}
+      ASTERISK_ENABLE_DEV_EXTRAS: '1'
+      ASTERISK_SIP_DOMAIN: ${ASTERISK_SIP_DOMAIN:-aicc.local}
     volumes:
       - ./asterisk/config:/etc/asterisk:rw
       - ./asterisk/certs:/etc/asterisk/keys:rw

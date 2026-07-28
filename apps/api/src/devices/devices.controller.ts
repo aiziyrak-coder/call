@@ -48,6 +48,7 @@ export class DevicesController {
   @Public()
   @UseGuards(DeviceAuthGuard)
   @Post('heartbeat')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @ApiOperation({ summary: 'Qurilma holati va kutilayotgan buyruqlar' })
   heartbeat(@Req() request: DeviceRequest, @Body() body: HeartbeatDto) {
     return this.devices.heartbeat(requireDevice(request), body);
@@ -56,6 +57,7 @@ export class DevicesController {
   @Public()
   @UseGuards(DeviceAuthGuard)
   @Get('outbox')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @ApiOperation({ summary: "Jo'natilishi kerak bo'lgan SMS lar" })
   outbox(@Req() request: DeviceRequest) {
     return this.devices.outbox(requireDevice(request));
@@ -64,6 +66,7 @@ export class DevicesController {
   @Public()
   @UseGuards(DeviceAuthGuard)
   @Post('sms/status')
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
   @ApiOperation({ summary: 'SMS yuborilish natijasi' })
   smsStatus(@Req() request: DeviceRequest, @Body() body: SmsStatusReportDto) {
     const device = requireDevice(request);
@@ -79,6 +82,7 @@ export class DevicesController {
   @Public()
   @UseGuards(DeviceAuthGuard)
   @Post('sms/inbound')
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
   @ApiOperation({ summary: 'Qabul qilingan SMS ni CRM ga yozish' })
   inbound(@Req() request: DeviceRequest, @Body() body: InboundSmsDto) {
     const device = requireDevice(request);

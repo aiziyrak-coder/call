@@ -55,6 +55,17 @@ const mediaForkSchema = z.object({
   transport: z.enum(['audiosocket', 'externalmedia']).default('audiosocket'),
 });
 
+/** Docker / lokal probe — SERVICE_TOKEN talab qilmaydi (faqat ichki tarmoq). */
+@Controller('telephony')
+export class TelephonyHealthController {
+  constructor(private readonly provider: AsteriskTelephonyProvider) {}
+
+  @Get('health')
+  health() {
+    return this.provider.healthCheck();
+  }
+}
+
 @Controller('telephony')
 @UseGuards(ServiceTokenGuard)
 export class TelephonyController {
@@ -62,11 +73,6 @@ export class TelephonyController {
     private readonly provider: AsteriskTelephonyProvider,
     private readonly registry: CallRegistry,
   ) {}
-
-  @Get('health')
-  health() {
-    return this.provider.healthCheck();
-  }
 
   @Get('calls')
   activeCalls() {

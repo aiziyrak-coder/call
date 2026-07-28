@@ -67,7 +67,8 @@ export default function ContactsPage() {
     // Fayl yuklab olish uchun `fetch` orqali blob olamiz — `api` JSON kutadi.
     const base = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
     const response = await fetch(`${base}/api/v1/contacts/export`, {
-      headers: { Authorization: `Bearer ${tokenStore.access ?? ''}` },
+      credentials: 'include',
+      headers: tokenStore.access ? { Authorization: `Bearer ${tokenStore.access}` } : {},
     });
     if (!response.ok) {
       toast.error("Eksport qilib bo'lmadi");

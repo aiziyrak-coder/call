@@ -19,8 +19,8 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  const finish = async (tokens: { accessToken: string; expiresIn?: number }) => {
-    tokenStore.set(tokens.accessToken);
+  const finish = async (tokens?: { accessToken?: string; expiresIn?: number }) => {
+    if (tokens?.accessToken) tokenStore.set(tokens.accessToken);
     const profile = await api.get<CurrentUser>('/users/me');
     setUser(profile);
     router.replace('/');
@@ -39,6 +39,7 @@ export default function LoginPage() {
           { anonymous: true },
         );
         if (result.tokens) await finish(result.tokens);
+        else if (result.status === 'authenticated') await finish();
         return;
       }
 
@@ -53,6 +54,7 @@ export default function LoginPage() {
         return;
       }
       if (result.tokens) await finish(result.tokens);
+      else if (result.status === 'authenticated') await finish();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Kirishda xato yuz berdi');
     } finally {

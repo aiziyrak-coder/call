@@ -14,9 +14,15 @@ if [[ ! -f infra/.env.prod ]]; then
 fi
 chmod 600 infra/.env.prod || true
 
-echo "==> Build + up (healthy kutish)"
+echo "==> Build"
 "${COMPOSE[@]}" build
-"${COMPOSE[@]}" up -d --wait --wait-timeout 180
+
+echo "==> Up (minio-init one-shot + healthy servislar)"
+# Avval infra + init, keyin app — --wait ishonchliroq
+"${COMPOSE[@]}" up -d --wait --wait-timeout 240 \
+  postgres redis minio minio-init
+"${COMPOSE[@]}" up -d --wait --wait-timeout 300 \
+  asterisk ai-worker api telephony web
 
 echo "==> Migratsiya (seed prod da o'chirilgan)"
 "${COMPOSE[@]}" exec -T api sh -c 'pnpm exec prisma migrate deploy'
@@ -52,4 +58,6 @@ code="$(curl -fsS -o /tmp/aicc-health.json -w '%{http_code}' http://127.0.0.1:14
 grep -q '"status":"ok"' /tmp/aicc-health.json || { echo "API degraded"; cat /tmp/aicc-health.json; exit 1; }
 curl -fsS -o /dev/null -w "web   %{http_code}\n" http://127.0.0.1:13100/
 curl -fsS -o /dev/null -w "https %{http_code}\n" https://call.devflix.uz/api/v1/health
+# RTP portlari ochiqligini tekshirish (UDP listen)
+ss -uln | grep -q ':10000' || echo "WARN: RTP 10000 UDP listen ko'rinmadi"
 echo "OK https://call.devflix.uz"

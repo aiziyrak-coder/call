@@ -60,6 +60,11 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   async handleConnection(client: Socket): Promise<void> {
     const origin = client.handshake.headers.origin;
+    const isProd = this.config.get<string>('NODE_ENV') === 'production';
+    if (isProd && !origin) {
+      client.disconnect(true);
+      return;
+    }
     if (origin && this.corsOrigins.length > 0 && !this.corsOrigins.includes(origin)) {
       client.disconnect(true);
       return;

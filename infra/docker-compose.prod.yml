@@ -47,7 +47,7 @@ services:
         '--maxmemory',
         '512mb',
         '--maxmemory-policy',
-        'allkeys-lru',
+        'volatile-lru',
       ]
     volumes:
       - aicc_call_redis:/data
@@ -64,7 +64,8 @@ services:
     security_opt: ['no-new-privileges:true']
 
   minio:
-    image: minio/minio:latest
+    # Pin: latest da curl yo'qolishi mumkin — healthcheck ishonchliligi uchun
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
     container_name: aicc-call-minio
     restart: unless-stopped
     command: ['server', '/data', '--console-address', ':9001']
@@ -79,7 +80,11 @@ services:
       resources:
         limits: { cpus: '1.0', memory: 1G }
     healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://127.0.0.1:9000/minio/health/live']
+      test:
+        [
+          'CMD-SHELL',
+          'curl -sf http://127.0.0.1:9000/minio/health/live >/dev/null || wget -q -O /dev/null http://127.0.0.1:9000/minio/health/live || exit 1',
+        ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -87,7 +92,7 @@ services:
     security_opt: ['no-new-privileges:true']
 
   minio-init:
-    image: minio/mc:latest
+    image: minio/mc:RELEASE.2024-11-17T19-35-25Z
     container_name: aicc-call-minio-init
     depends_on:
       minio:
@@ -135,6 +140,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
     networks: [aicc_call_net]
     logging: *default-logging
     deploy:
@@ -203,12 +210,18 @@ services:
       asterisk:
         condition: service_healthy
       ai-worker:
-        condition: service_started
+        condition: service_healthy
     networks: [aicc_call_net]
     logging: *default-logging
     deploy:
       resources:
         limits: { cpus: '1.5', memory: 1G }
+    healthcheck:
+      test: ['CMD-SHELL', 'node -e "fetch(\"http://127.0.0.1:4100/internal/telephony/health\").then(async r=>{const j=await r.json();process.exit(r.ok&&j.healthy?0:1)}).catch(()=>process.exit(1))"']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
     security_opt: ['no-new-privileges:true']
 
   ai-worker:
@@ -253,6 +266,12 @@ services:
     environment:
       ARI_USER: ${ARI_USER}
       ARI_PASSWORD: ${ARI_PASSWORD}
+      ARI_REQUIRE_STRONG: '1'
+      NODE_ENV: production
+      ASTERISK_SIP_DOMAIN: ${ASTERISK_SIP_DOMAIN:-call.devflix.uz}
+      ASTERISK_PUBLIC_IP: ${ASTERISK_PUBLIC_IP:-87.192.230.208}
+      GSM_GATEWAY_PASSWORD: ${GSM_GATEWAY_PASSWORD:-}
+      ASTERISK_ENABLE_DEV_EXTRAS: '0'
     volumes:
       - ./asterisk/config:/etc/asterisk:rw
       - aicc_call_recordings:/var/spool/asterisk/recording:rw
@@ -260,6 +279,8 @@ services:
     ports:
       - '127.0.0.1:18088:8088'
       - '127.0.0.1:18089:8089'
+      # WebRTC / media (DTLS-SRTP) — host firewall faqat kerakli IP ga ochilsin
+      - '10000-10100:10000-10100/udp'
     networks: [aicc_call_net]
     logging: *default-logging
     deploy:

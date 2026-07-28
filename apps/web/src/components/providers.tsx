@@ -32,12 +32,12 @@ function AuthBootstrap({ children }: { children: ReactNode }) {
       }
 
       try {
-        const refreshed = await api.post<{ accessToken: string; expiresIn?: number }>(
+        const refreshed = await api.post<{ accessToken?: string; expiresIn?: number }>(
           '/auth/refresh',
           {},
           { anonymous: true },
         );
-        tokenStore.set(refreshed.accessToken);
+        if (refreshed.accessToken) tokenStore.set(refreshed.accessToken);
         const profile = await api.get<CurrentUser>('/users/me');
         if (!cancelled) setUser(profile);
       } catch {
