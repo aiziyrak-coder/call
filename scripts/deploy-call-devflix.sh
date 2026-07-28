@@ -17,10 +17,27 @@ chmod 600 infra/.env.prod || true
 echo "==> Build"
 "${COMPOSE[@]}" build
 
-echo "==> Up (minio-init one-shot + healthy servislar)"
-# Avval infra + init, keyin app — --wait ishonchliroq
-"${COMPOSE[@]}" up -d --wait --wait-timeout 240 \
-  postgres redis minio minio-init
+echo "==> Infra up"
+"${COMPOSE[@]}" up -d postgres redis minio
+"${COMPOSE[@]}" up -d --wait --wait-timeout 180 postgres redis minio
+
+echo "==> MinIO bucket init (one-shot, --wait emas)"
+"${COMPOSE[@]}" run --rm --entrypoint /bin/sh minio-init -c '
+  mc alias set local http://minio:9000 "$S3_ACCESS_KEY" "$S3_SECRET_KEY" &&
+  mc mb --ignore-existing "local/$S3_BUCKET" &&
+  mc version enable "local/$S3_BUCKET" || true &&
+  echo bucket_ok
+' || "${COMPOSE[@]}" up -d --force-recreate minio-init
+
+# One-shot tugashini kutish (compose --wait one-shot da tiqilib qolishi mumkin)
+for i in $(seq 1 60); do
+  st="$("${COMPOSE[@]}" ps -a --format '{{.Name}} {{.Status}}' | grep minio-init || true)"
+  echo "$st" | grep -qi 'Exited (0)' && break
+  echo "$st" | grep -qi 'Exited' && { echo "minio-init failed: $st"; exit 1; }
+  sleep 2
+done
+
+echo "==> App up (healthy kutish)"
 "${COMPOSE[@]}" up -d --wait --wait-timeout 300 \
   asterisk ai-worker api telephony web
 
